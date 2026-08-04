@@ -1,0 +1,31 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# AI Configuration
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
+
+# Job Search Configuration
+SEARCH_KEYWORDS = os.getenv("SEARCH_KEYWORDS", "Software Engineer")
+SEARCH_LOCATION = os.getenv("SEARCH_LOCATION", "United States")
+PAST_24_HOURS_FILTER = True
+
+# Limits & Safety (crucial for LinkedIn)
+MAX_MESSAGES_PER_DAY = int(os.getenv("MAX_MESSAGES_PER_DAY", "10"))
+MAX_PEOPLE_PER_COMPANY = int(os.getenv("MAX_PEOPLE_PER_COMPANY", "3"))
+
+# Agent Mode
+DRY_RUN = os.getenv("DRY_RUN", "True").lower() in ("true", "1", "t")
+
+# User Profile Data
+USER_RESUME = os.getenv("USER_RESUME", """
+I am an experienced Software Engineer with 5+ years of experience in Python, TypeScript, and React. 
+I have built scalable web applications and worked extensively with LLMs and AI integrations.
+""")
+
+USER_PREFERENCES = os.getenv("USER_PREFERENCES", """
+Looking for remote or hybrid roles. Open to Senior or Mid-level positions. 
+I prefer companies working in AI, developer tools, or fintech.
+""")
