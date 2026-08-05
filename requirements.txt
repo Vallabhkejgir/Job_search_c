@@ -1,5 +1,5 @@
 playwright
 langchain
-openai
+langchain-google-genai
 python-dotenv
 pydantic
