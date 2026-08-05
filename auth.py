@@ -20,7 +20,6 @@ def manual_login():
         context = p.chromium.launch_persistent_context(
             user_data_dir=SESSION_DIR,
             headless=False, # Must be false for manual login
-            channel="chrome", # Often helps avoid basic bot detection
             args=["--disable-blink-features=AutomationControlled"]
         )
         

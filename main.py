@@ -28,7 +28,6 @@ def main():
         context = p.chromium.launch_persistent_context(
             user_data_dir=SESSION_DIR,
             headless=False, # Often safer to run headful to avoid bot detection
-            channel="chrome",
             args=["--disable-blink-features=AutomationControlled"],
             viewport={"width": 1280, "height": 800}
         )

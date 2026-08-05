@@ -19,15 +19,23 @@ def scrape_jobs(page, config):
     """
     url = get_job_search_url(config.SEARCH_KEYWORDS, config.SEARCH_LOCATION, config.PAST_24_HOURS_FILTER)
     print(f"Navigating to job search: {url}")
-    
-    page.goto(url)
+
+    # Use domcontentloaded or a longer timeout for the heavy LinkedIn jobs page
+    page.goto(url, wait_until="domcontentloaded", timeout=60000)
     page.wait_for_timeout(random.randint(3000, 5000))
     
     jobs = []
     
     # Wait for job list container
     try:
-        page.wait_for_selector(".scaffold-layout__list-container", timeout=10000)
+        # Fallback selectors for different LinkedIn layouts
+        try:
+            page.wait_for_selector(".scaffold-layout__list", timeout=10000)
+        except:
+            try:
+                page.wait_for_selector(".scaffold-layout__list-container", timeout=10000)
+            except:
+                page.wait_for_selector(".job-card-container", timeout=10000)
     except Exception as e:
         print("Could not find job list container. Maybe no results or blocked by captcha/login wall.")
         return jobs
@@ -60,14 +68,14 @@ def scrape_jobs(page, config):
                 print(f"Skipping job {job_id} - already processed.")
                 continue
                 
-            title_elem = card.locator(".job-card-list__title")
-            title = title_elem.inner_text().strip() if title_elem.count() > 0 else "Unknown Title"
-            
-            company_elem = card.locator(".job-card-container__primary-description")
-            company = company_elem.inner_text().strip() if company_elem.count() > 0 else "Unknown Company"
+            title_elem = card.locator(".job-card-list__title, .job-card-container__title")
+            title = title_elem.first.inner_text().strip() if title_elem.count() > 0 else "Unknown Title"
+
+            company_elem = card.locator(".job-card-container__primary-description, .job-card-container__company-name")
+            company = company_elem.first.inner_text().strip() if company_elem.count() > 0 else "Unknown Company"
             
             # Extract full description from the right panel
-            desc_locator = page.locator("#job-details")
+            desc_locator = page.locator("#job-details, .jobs-description").first
             if desc_locator.count() > 0:
                 # Use BeautifulSoup to get clean text without tons of HTML tags
                 html_content = desc_locator.inner_html()
