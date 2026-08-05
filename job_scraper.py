@@ -68,10 +68,10 @@ def scrape_jobs(page, config):
                 print(f"Skipping job {job_id} - already processed.")
                 continue
                 
-            title_elem = card.locator(".job-card-list__title, .job-card-container__title")
+            title_elem = card.locator(".job-card-list__title, .job-card-container__title, strong")
             title = title_elem.first.inner_text().strip() if title_elem.count() > 0 else "Unknown Title"
 
-            company_elem = card.locator(".job-card-container__primary-description, .job-card-container__company-name")
+            company_elem = card.locator(".job-card-container__primary-description, .job-card-container__company-name, .artdeco-entity-lockup__subtitle")
             company = company_elem.first.inner_text().strip() if company_elem.count() > 0 else "Unknown Company"
             
             # Extract full description from the right panel
