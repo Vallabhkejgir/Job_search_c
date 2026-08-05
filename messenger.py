@@ -71,6 +71,17 @@ def search_employees(page, company_name, target_titles):
 
             # Don't add if it's not a real profile link or already messaged
             if name and name != "LinkedIn Member" and "View" not in name and not is_user_messaged(profile_url):
+                # Verify they actually work at the company by checking the parent container text
+                parent_container = link_locator.locator("xpath=ancestor::li").first
+                if parent_container.count() == 0:
+                    parent_container = link_locator.locator("xpath=ancestor::div[contains(@class, 'search-results-container') or contains(@class, 'entity-result__item')]").first
+
+                if parent_container.count() > 0:
+                    full_text = parent_container.inner_text().lower()
+                    if company_name.lower() not in full_text:
+                        print(f"Skipping {name} - '{company_name}' not found in their headline.")
+                        continue
+
                 employees.append({
                     "name": name,
                     "profile_url": profile_url,
