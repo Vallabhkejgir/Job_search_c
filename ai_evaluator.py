@@ -1,6 +1,6 @@
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
 class JobEvaluation(BaseModel):
@@ -16,17 +16,17 @@ def evaluate_job(job, config):
     print(f"Evaluating job: {job['title']} at {job['company']}")
     
     # Check if we have API key
-    if not config.OPENAI_API_KEY:
-        print("Warning: OPENAI_API_KEY not set. Falling back to default match.")
+    if not config.GEMINI_API_KEY:
+        print("Warning: GEMINI_API_KEY not set. Falling back to default match.")
         return JobEvaluation(
             is_match=True,
             match_reason="I have the relevant skills for this role.",
             target_titles=["Recruiter", "Hiring Manager"]
         )
-        
-    llm = ChatOpenAI(
-        model=config.LLM_MODEL, 
-        api_key=config.OPENAI_API_KEY,
+
+    llm = ChatGoogleGenerativeAI(
+        model=config.LLM_MODEL,
+        google_api_key=config.GEMINI_API_KEY,
         temperature=0.2
     )
     

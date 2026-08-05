@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # AI Configuration
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+LLM_MODEL = os.getenv("LLM_MODEL", "gemini-flash-latest")
 
 # Job Search Configuration
 SEARCH_KEYWORDS = os.getenv("SEARCH_KEYWORDS", "Software Engineer")
