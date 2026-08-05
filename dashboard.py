@@ -24,12 +24,15 @@ async def read_root(request: Request):
 
     is_running = AGENT_PROCESS is not None and AGENT_PROCESS.poll() is None
 
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "jobs": jobs,
-        "users": users,
-        "is_running": is_running
-    })
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={
+            "jobs": jobs,
+            "users": users,
+            "is_running": is_running
+        }
+    )
 
 @app.post("/api/run")
 async def run_agent():
