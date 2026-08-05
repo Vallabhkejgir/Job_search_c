@@ -45,10 +45,6 @@ def main():
 
         # 2. Interleaved Process: Extract -> Evaluate -> Search Employees -> Message
         for i in range(num_cards):
-            if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
-                print("Reached daily message limit. Stopping for today.")
-                break
-
             if jobs_evaluated_today >= TARGET_EVALUATIONS:
                 print(f"Reached target of {TARGET_EVALUATIONS} new evaluations. Stopping.")
                 break
@@ -80,6 +76,11 @@ def main():
                 continue
 
             print(f"AI MATCH! Reason: {evaluation.match_reason}")
+
+            # Check if we can still send messages
+            if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
+                print(f"Daily message limit ({config.MAX_MESSAGES_PER_DAY}) reached. Skipping messaging for {job['company']} but will continue evaluating jobs.")
+                continue
 
             # 3. Find employees using a dedicated worker tab
             worker_page = context.new_page()
