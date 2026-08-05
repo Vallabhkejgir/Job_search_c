@@ -3,48 +3,53 @@ import time
 import random
 from database import is_user_messaged, log_user_messaged
 
-def search_employees(page, company_name, target_titles):
+def search_employees(page, company_url, company_name, target_titles):
     """
-    Search for employees at a specific company with target titles.
+    Search for employees at a specific company with target titles by visiting the company's People tab.
     """
     print(f"Searching for employees at {company_name}...")
     employees = []
-    
-    # We construct a people search URL directly
-    # Keywords are target titles OR'd together
-    keywords = " OR ".join([f'"{title}"' for title in target_titles])
-    
-    # Simple search for the company and title keywords in people
-    search_query = f"{company_name} {keywords}"
-    encoded_query = urllib.parse.urlencode({"keywords": search_query})
-    search_url = f"https://www.linkedin.com/search/results/people/?{encoded_query}"
-    
-    page.goto(search_url)
-    page.wait_for_timeout(random.randint(3000, 5000))
-    
-    # Wait for results
-    try:
-        # Check standard container or fallbacks
-        try:
-            page.wait_for_selector(".reusable-search__result-container", timeout=10000)
-        except:
-            try:
-                page.wait_for_selector(".search-results-container", timeout=10000)
-            except:
-                page.wait_for_selector("a[href*='/in/']", timeout=10000)
-    except:
-        print(f"No employee results found for {company_name}")
+
+    if not company_url:
+        print(f"No company URL found for {company_name}. Cannot search their People tab.")
         return employees
+
+    # Ensure the company URL ends with a slash before appending "people/"
+    if not company_url.endswith("/"):
+        company_url += "/"
+
+    people_url = f"{company_url}people/"
+    print(f"Navigating to company people page: {people_url}")
+
+    try:
+        page.goto(people_url, wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(random.randint(3000, 5000))
+    except Exception as e:
+        print(f"Failed to load company people page: {e}")
+        return employees
+
+    # Type the target titles into the "Search employees" input box
+    try:
+        keywords = " OR ".join([f'"{title}"' for title in target_titles])
+        search_input = page.locator("input[placeholder*='Search employees'], input#people-search-keywords").first
+        if search_input.count() > 0:
+            search_input.fill(keywords)
+            search_input.press("Enter")
+            page.wait_for_timeout(random.randint(4000, 6000))
+        else:
+            print("Could not find the search box on the company People tab. Proceeding with raw list.")
+    except Exception as e:
+        print(f"Error interacting with company search box: {e}")
 
     # Scroll slightly more aggressively to load all images/lazy loaded DOM elements
     for _ in range(3):
         page.evaluate("window.scrollBy(0, 1000)")
         page.wait_for_timeout(1000)
 
-    # Extract profiles. We use a broad locator that gets people links
-    # Then we walk up to the container, or just process the links directly
+    # Extract profiles from the company people grid
+    # Usually the grid cards contain links to profiles
     profile_links = page.locator("a[href*='/in/']").all()
-    print(f"Found {len(profile_links)} profile links to evaluate.")
+    print(f"Found {len(profile_links)} profile links to evaluate on company page.")
 
     # Use a set to deduplicate since links often appear twice (image and text)
     seen_urls = set()
@@ -71,33 +76,33 @@ def search_employees(page, company_name, target_titles):
             # Clean up newlines or extra text (like "View profile")
             name = name_text.split('\n')[0].strip() if name_text else "Unknown"
 
+            # Check if this link actually contains text (some are just image links)
+            # On the company page, the text link often contains the name.
+            if not name:
+                continue
+
             # Don't add if it's not a real profile link or already messaged
-            if name and name != "LinkedIn Member" and "View" not in name and not is_user_messaged(profile_url):
-                # Verify they actually work at the company by checking the parent container text
+            if name != "LinkedIn Member" and "View" not in name and not is_user_messaged(profile_url):
+                # On the company page, we don't strictly need to check if they still work there
+                # because the "People" tab is specifically for current employees.
+                # However, it doesn't hurt to keep a sanity check if the DOM supports it.
                 parent_container = link_locator.locator("xpath=ancestor::li").first
                 if parent_container.count() == 0:
-                    parent_container = link_locator.locator("xpath=ancestor::div[contains(@class, 'search-results-container') or contains(@class, 'entity-result__item')]").first
+                    # In company people grids, the container is often a div
+                    parent_container = link_locator.locator("xpath=ancestor::div[contains(@class, 'org-people-profile-card') or contains(@class, 'entity-result__item')]").first
 
                 if parent_container.count() > 0:
                     full_text = parent_container.inner_text().lower()
 
-                    # Check 1: Is the company mentioned AT ALL?
-                    if company_name.lower() not in full_text:
-                        print(f"Skipping {name} - '{company_name}' not found in their profile snippet.")
-                        continue
-
-                    # Check 2: Try to get the specific headline
-                    headline_elem = parent_container.locator(".entity-result__primary-subtitle, .linked-area").first
+                    # Try to get the specific headline
+                    headline_elem = parent_container.locator(".lt-line-clamp--multi-line, .artdeco-entity-lockup__subtitle").first
                     if headline_elem.count() > 0:
                         headline_text = headline_elem.inner_text().lower()
-                        if company_name.lower() not in headline_text:
-                            print(f"Skipping {name} - '{company_name}' not found in their CURRENT headline.")
-                            continue
-                    else:
-                        # Fallback check: if we can't find the headline specifically,
-                        # ensure it's not explicitly listed as a "Past:" role
-                        if f"past: {company_name.lower()}" in full_text or f"past:  {company_name.lower()}" in full_text:
-                            print(f"Skipping {name} - '{company_name}' appears to be a past role.")
+                        # Verify the headline contains one of our target titles
+                        # Because the company search box might not perfectly filter
+                        matched_title = any(t.lower() in headline_text for t in target_titles)
+                        if not matched_title and len(target_titles) > 0:
+                            print(f"Skipping {name} - Headline '{headline_text}' does not match any target titles.")
                             continue
 
                 employees.append({

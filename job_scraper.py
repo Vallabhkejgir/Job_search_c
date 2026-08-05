@@ -73,7 +73,15 @@ def scrape_jobs(page, config):
 
             company_elem = card.locator(".job-card-container__primary-description, .job-card-container__company-name, .artdeco-entity-lockup__subtitle")
             company = company_elem.first.inner_text().strip() if company_elem.count() > 0 else "Unknown Company"
-            
+
+            # Attempt to extract company URL
+            company_link = company_elem.locator("a").first
+            if company_link.count() > 0:
+                company_url = company_link.get_attribute("href")
+                company_url = company_url.split("?")[0] if company_url else None
+            else:
+                company_url = None
+
             # Extract full description from the right panel
             desc_locator = page.locator("#job-details, .jobs-description").first
             if desc_locator.count() > 0:
@@ -88,6 +96,7 @@ def scrape_jobs(page, config):
                 "job_id": job_id,
                 "title": title,
                 "company": company,
+                "company_url": company_url,
                 "description": description,
                 "url": f"https://www.linkedin.com/jobs/view/{job_id}"
             })

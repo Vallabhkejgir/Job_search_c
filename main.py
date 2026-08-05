@@ -37,47 +37,51 @@ def main():
         # 1. Scrape Jobs
         jobs = scrape_jobs(page, config)
         print(f"Found {len(jobs)} new jobs to evaluate.")
-        
+
         # 2. Process each job
         for job in jobs:
             if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
                 print("Reached daily message limit. Stopping for today.")
                 break
-                
+
             # Evaluate with AI
             evaluation = evaluate_job(job, config)
-            
+
             # Log job
             log_job_processed(
-                job['job_id'], 
-                job['title'], 
-                job['company'], 
-                evaluation.is_match, 
+                job['job_id'],
+                job['title'],
+                job['company'],
+                evaluation.is_match,
                 evaluation.match_reason
             )
-            
+
             if not evaluation.is_match:
                 print(f"AI determined {job['company']} is NOT a match. Skipping.")
                 continue
-                
+
             print(f"AI MATCH! Reason: {evaluation.match_reason}")
-            
-            # 3. Find employees
-            employees = search_employees(page, job['company'], evaluation.target_titles)
-            
-            # 4. Message employees
-            messaged_for_this_company = 0
-            for emp in employees:
-                if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
-                    break
-                if messaged_for_this_company >= config.MAX_PEOPLE_PER_COMPANY:
-                    break
-                    
-                success = send_connection_request(page, emp, job, evaluation.match_reason, config)
-                
-                if success:
-                    messages_sent_today += 1
-                    messaged_for_this_company += 1
+
+            # 3. Find employees using a dedicated worker tab
+            worker_page = context.new_page()
+            try:
+                employees = search_employees(worker_page, job.get('company_url'), job['company'], evaluation.target_titles)
+
+                # 4. Message employees
+                messaged_for_this_company = 0
+                for emp in employees:
+                    if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
+                        break
+                    if messaged_for_this_company >= config.MAX_PEOPLE_PER_COMPANY:
+                        break
+
+                    success = send_connection_request(worker_page, emp, job, evaluation.match_reason, config)
+
+                    if success:
+                        messages_sent_today += 1
+                        messaged_for_this_company += 1
+            finally:
+                worker_page.close()
                     
         print(f"Finished run. Sent {messages_sent_today} messages.")
         context.close()
