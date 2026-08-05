@@ -36,13 +36,15 @@ def search_employees(page, company_name, target_titles):
         print(f"No employee results found for {company_name}")
         return employees
 
-    # Scroll slightly
-    page.evaluate("window.scrollBy(0, 500)")
-    page.wait_for_timeout(1000)
+    # Scroll slightly more aggressively to load all images/lazy loaded DOM elements
+    for _ in range(3):
+        page.evaluate("window.scrollBy(0, 1000)")
+        page.wait_for_timeout(1000)
 
     # Extract profiles. We use a broad locator that gets people links
     # Then we walk up to the container, or just process the links directly
     profile_links = page.locator("a[href*='/in/']").all()
+    print(f"Found {len(profile_links)} profile links to evaluate.")
 
     # Use a set to deduplicate since links often appear twice (image and text)
     seen_urls = set()
@@ -104,7 +106,7 @@ def search_employees(page, company_name, target_titles):
                     "company": company_name
                 })
 
-                if len(employees) >= 5:  # Top 5 max
+                if len(employees) >= 10:  # Collect up to 10 valid candidates
                     break
 
         except Exception as e:
