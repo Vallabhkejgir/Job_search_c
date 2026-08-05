@@ -39,12 +39,12 @@ def load_job_search_page(page, config):
         return 0
 
     # Scroll the job list panel to load more jobs (LinkedIn uses lazy loading)
-    for _ in range(3):
+    for _ in range(8):
         page.evaluate("""
             var element = document.querySelector('.jobs-search-results-list');
-            if(element) element.scrollBy(0, 1000);
+            if(element) element.scrollBy(0, 1500);
         """)
-        page.wait_for_timeout(random.randint(1000, 2000))
+        page.wait_for_timeout(random.randint(1500, 2500))
 
     # Extract job cards
     job_cards_count = page.locator(".job-card-container").count()

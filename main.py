@@ -40,22 +40,28 @@ def main():
             print("No jobs found or unable to load job search page.")
             return
 
-        # Limit to processing a maximum of 10 jobs per run to avoid overly long executions
-        max_jobs_to_process = min(num_cards, 10)
+        TARGET_EVALUATIONS = 15
+        jobs_evaluated_today = 0
 
         # 2. Interleaved Process: Extract -> Evaluate -> Search Employees -> Message
-        for i in range(max_jobs_to_process):
+        for i in range(num_cards):
             if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
                 print("Reached daily message limit. Stopping for today.")
+                break
+
+            if jobs_evaluated_today >= TARGET_EVALUATIONS:
+                print(f"Reached target of {TARGET_EVALUATIONS} new evaluations. Stopping.")
                 break
 
             # Dynamically locate the card to avoid stale element references if the DOM shifted
             card = page.locator(".job-card-container").nth(i)
 
-            # Extract job details
+            # Extract job details (this will return None and skip if already processed in DB)
             job = extract_job_from_card(page, card)
             if not job:
                 continue
+
+            jobs_evaluated_today += 1
 
             # Evaluate with AI
             evaluation = evaluate_job(job, config)
