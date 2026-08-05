@@ -13,9 +13,9 @@ def get_job_search_url(keywords, location, past_24_hours=True):
     }
     return base_url + urllib.parse.urlencode({k: v for k, v in params.items() if v})
 
-def scrape_jobs(page, config):
+def load_job_search_page(page, config):
     """
-    Navigates to the jobs page, scrolls to load listings, and extracts job details.
+    Navigates to the jobs page, scrolls to load listings, and returns the total number of job cards found.
     """
     url = get_job_search_url(config.SEARCH_KEYWORDS, config.SEARCH_LOCATION, config.PAST_24_HOURS_FILTER)
     print(f"Navigating to job search: {url}")
@@ -23,9 +23,7 @@ def scrape_jobs(page, config):
     # Use domcontentloaded or a longer timeout for the heavy LinkedIn jobs page
     page.goto(url, wait_until="domcontentloaded", timeout=60000)
     page.wait_for_timeout(random.randint(3000, 5000))
-    
-    jobs = []
-    
+
     # Wait for job list container
     try:
         # Fallback selectors for different LinkedIn layouts
@@ -38,8 +36,8 @@ def scrape_jobs(page, config):
                 page.wait_for_selector(".job-card-container", timeout=10000)
     except Exception as e:
         print("Could not find job list container. Maybe no results or blocked by captcha/login wall.")
-        return jobs
-        
+        return 0
+
     # Scroll the job list panel to load more jobs (LinkedIn uses lazy loading)
     for _ in range(3):
         page.evaluate("""
@@ -47,68 +45,62 @@ def scrape_jobs(page, config):
             if(element) element.scrollBy(0, 1000);
         """)
         page.wait_for_timeout(random.randint(1000, 2000))
-        
+
     # Extract job cards
-    job_cards = page.locator(".job-card-container").all()
-    print(f"Found {len(job_cards)} job cards on the page.")
-    
-    for card in job_cards:
-        try:
-            # Click the card to load details on the right panel
-            card.scroll_into_view_if_needed()
-            card.click()
-            page.wait_for_timeout(random.randint(2000, 3500))
-            
-            # Extract basic info
-            job_id = card.get_attribute("data-job-id")
-            if not job_id:
-                continue
-                
-            if is_job_processed(job_id):
-                print(f"Skipping job {job_id} - already processed.")
-                continue
-                
-            title_elem = card.locator(".job-card-list__title, .job-card-container__title, strong")
-            title = title_elem.first.inner_text().strip() if title_elem.count() > 0 else "Unknown Title"
+    job_cards_count = page.locator(".job-card-container").count()
+    print(f"Found {job_cards_count} job cards on the page.")
+    return job_cards_count
 
-            company_elem = card.locator(".job-card-container__primary-description, .job-card-container__company-name, .artdeco-entity-lockup__subtitle")
-            company = company_elem.first.inner_text().strip() if company_elem.count() > 0 else "Unknown Company"
+def extract_job_from_card(page, card):
+    try:
+        # Click the card to load details on the right panel
+        card.scroll_into_view_if_needed()
+        card.click()
+        page.wait_for_timeout(random.randint(2000, 3500))
 
-            # Attempt to extract company URL
-            company_link = company_elem.locator("a").first
-            if company_link.count() > 0:
-                company_url = company_link.get_attribute("href")
-                company_url = company_url.split("?")[0] if company_url else None
-            else:
-                company_url = None
+        # Extract basic info
+        job_id = card.get_attribute("data-job-id")
+        if not job_id:
+            return None
 
-            # Extract full description from the right panel
-            desc_locator = page.locator("#job-details, .jobs-description").first
-            if desc_locator.count() > 0:
-                # Use BeautifulSoup to get clean text without tons of HTML tags
-                html_content = desc_locator.inner_html()
-                soup = BeautifulSoup(html_content, "html.parser")
-                description = soup.get_text(separator="\n", strip=True)
-            else:
-                description = ""
-                
-            jobs.append({
-                "job_id": job_id,
-                "title": title,
-                "company": company,
-                "company_url": company_url,
-                "description": description,
-                "url": f"https://www.linkedin.com/jobs/view/{job_id}"
-            })
-            
-            print(f"Extracted: {title} at {company}")
-            
-            # Don't extract too many in one go to avoid limits
-            if len(jobs) >= 10:
-                break
-                
-        except Exception as e:
-            print(f"Error extracting a job card: {e}")
-            continue
-            
-    return jobs
+        if is_job_processed(job_id):
+            print(f"Skipping job {job_id} - already processed.")
+            return None
+
+        title_elem = card.locator(".job-card-list__title, .job-card-container__title, strong")
+        title = title_elem.first.inner_text().strip() if title_elem.count() > 0 else "Unknown Title"
+
+        company_elem = card.locator(".job-card-container__primary-description, .job-card-container__company-name, .artdeco-entity-lockup__subtitle")
+        company = company_elem.first.inner_text().strip() if company_elem.count() > 0 else "Unknown Company"
+
+        # Attempt to extract company URL
+        company_link = company_elem.locator("a").first
+        if company_link.count() > 0:
+            company_url = company_link.get_attribute("href")
+            company_url = company_url.split("?")[0] if company_url else None
+        else:
+            company_url = None
+
+        # Extract full description from the right panel
+        desc_locator = page.locator("#job-details, .jobs-description").first
+        if desc_locator.count() > 0:
+            # Use BeautifulSoup to get clean text without tons of HTML tags
+            html_content = desc_locator.inner_html()
+            soup = BeautifulSoup(html_content, "html.parser")
+            description = soup.get_text(separator="\n", strip=True)
+        else:
+            description = ""
+
+        print(f"Extracted: {title} at {company}")
+        return {
+            "job_id": job_id,
+            "title": title,
+            "company": company,
+            "company_url": company_url,
+            "description": description,
+            "url": f"https://www.linkedin.com/jobs/view/{job_id}"
+        }
+
+    except Exception as e:
+        print(f"Error extracting a job card: {e}")
+        return None

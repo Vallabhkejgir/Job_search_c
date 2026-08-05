@@ -3,7 +3,7 @@ import time
 import config
 from database import init_db, log_job_processed
 from auth import SESSION_DIR
-from job_scraper import scrape_jobs
+from job_scraper import load_job_search_page, extract_job_from_card
 from ai_evaluator import evaluate_job
 from messenger import search_employees, send_connection_request
 from playwright.sync_api import sync_playwright
@@ -33,16 +33,29 @@ def main():
         )
         
         page = context.pages[0] if context.pages else context.new_page()
-        
-        # 1. Scrape Jobs
-        jobs = scrape_jobs(page, config)
-        print(f"Found {len(jobs)} new jobs to evaluate.")
 
-        # 2. Process each job
-        for job in jobs:
+        # 1. Load Job Search Page
+        num_cards = load_job_search_page(page, config)
+        if num_cards == 0:
+            print("No jobs found or unable to load job search page.")
+            return
+
+        # Limit to processing a maximum of 10 jobs per run to avoid overly long executions
+        max_jobs_to_process = min(num_cards, 10)
+
+        # 2. Interleaved Process: Extract -> Evaluate -> Search Employees -> Message
+        for i in range(max_jobs_to_process):
             if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
                 print("Reached daily message limit. Stopping for today.")
                 break
+
+            # Dynamically locate the card to avoid stale element references if the DOM shifted
+            card = page.locator(".job-card-container").nth(i)
+
+            # Extract job details
+            job = extract_job_from_card(page, card)
+            if not job:
+                continue
 
             # Evaluate with AI
             evaluation = evaluate_job(job, config)
@@ -82,7 +95,11 @@ def main():
                         messaged_for_this_company += 1
             finally:
                 worker_page.close()
-                    
+
+            # Return to the main tab context visually (optional, Playwright handles it internally)
+            page.bring_to_front()
+            page.wait_for_timeout(1000)
+
         print(f"Finished run. Sent {messages_sent_today} messages.")
         context.close()
 
