@@ -78,9 +78,25 @@ def search_employees(page, company_name, target_titles):
 
                 if parent_container.count() > 0:
                     full_text = parent_container.inner_text().lower()
+
+                    # Check 1: Is the company mentioned AT ALL?
                     if company_name.lower() not in full_text:
-                        print(f"Skipping {name} - '{company_name}' not found in their headline.")
+                        print(f"Skipping {name} - '{company_name}' not found in their profile snippet.")
                         continue
+
+                    # Check 2: Try to get the specific headline
+                    headline_elem = parent_container.locator(".entity-result__primary-subtitle, .linked-area").first
+                    if headline_elem.count() > 0:
+                        headline_text = headline_elem.inner_text().lower()
+                        if company_name.lower() not in headline_text:
+                            print(f"Skipping {name} - '{company_name}' not found in their CURRENT headline.")
+                            continue
+                    else:
+                        # Fallback check: if we can't find the headline specifically,
+                        # ensure it's not explicitly listed as a "Past:" role
+                        if f"past: {company_name.lower()}" in full_text or f"past:  {company_name.lower()}" in full_text:
+                            print(f"Skipping {name} - '{company_name}' appears to be a past role.")
+                            continue
 
                 employees.append({
                     "name": name,
