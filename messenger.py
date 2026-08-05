@@ -24,43 +24,65 @@ def search_employees(page, company_name, target_titles):
     
     # Wait for results
     try:
-        page.wait_for_selector(".reusable-search__result-container", timeout=10000)
+        # Check standard container or fallbacks
+        try:
+            page.wait_for_selector(".reusable-search__result-container", timeout=10000)
+        except:
+            try:
+                page.wait_for_selector(".search-results-container", timeout=10000)
+            except:
+                page.wait_for_selector("a[href*='/in/']", timeout=10000)
     except:
         print(f"No employee results found for {company_name}")
         return employees
-        
+
     # Scroll slightly
     page.evaluate("window.scrollBy(0, 500)")
     page.wait_for_timeout(1000)
-    
-    # Extract profiles
-    results = page.locator(".reusable-search__result-container").all()
-    
-    for result in results[:5]:  # Top 5 max
+
+    # Extract profiles. We use a broad locator that gets people links
+    # Then we walk up to the container, or just process the links directly
+    profile_links = page.locator("a[href*='/in/']").all()
+
+    # Use a set to deduplicate since links often appear twice (image and text)
+    seen_urls = set()
+
+    for link_locator in profile_links:
         try:
-            link_locator = result.locator("a.app-aware-link").first
-            if link_locator.count() == 0:
-                continue
-                
             profile_url = link_locator.get_attribute("href")
+            if not profile_url:
+                continue
+
             # Clean URL
-            if profile_url and "?" in profile_url:
+            if "?" in profile_url:
                 profile_url = profile_url.split("?")[0]
-                
-            name_locator = result.locator(".entity-result__title-text span[aria-hidden='true']").first
-            name = name_locator.inner_text().strip() if name_locator.count() > 0 else "Unknown"
-            
-            # Don't add if already messaged
-            if profile_url and not is_user_messaged(profile_url) and name != "LinkedIn Member":
+
+            if profile_url in seen_urls:
+                continue
+
+            seen_urls.add(profile_url)
+
+            # Since the layout changed, grab the name from the text inside the link
+            # The name is usually the bolded text or the only text
+            name_text = link_locator.inner_text().strip()
+
+            # Clean up newlines or extra text (like "View profile")
+            name = name_text.split('\n')[0].strip() if name_text else "Unknown"
+
+            # Don't add if it's not a real profile link or already messaged
+            if name and name != "LinkedIn Member" and "View" not in name and not is_user_messaged(profile_url):
                 employees.append({
                     "name": name,
                     "profile_url": profile_url,
                     "company": company_name
                 })
-                
+
+                if len(employees) >= 5:  # Top 5 max
+                    break
+
         except Exception as e:
             print(f"Error extracting profile: {e}")
-            
+
     print(f"Found {len(employees)} potential contacts at {company_name}.")
     return employees
 
