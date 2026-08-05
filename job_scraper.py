@@ -73,13 +73,31 @@ def extract_job_from_card(page, card):
         company_elem = card.locator(".job-card-container__primary-description, .job-card-container__company-name, .artdeco-entity-lockup__subtitle")
         company = company_elem.first.inner_text().strip() if company_elem.count() > 0 else "Unknown Company"
 
-        # Attempt to extract company URL
+        # Attempt to extract company URL from the card first
         company_link = company_elem.locator("a").first
+        company_url = None
         if company_link.count() > 0:
-            company_url = company_link.get_attribute("href")
-            company_url = company_url.split("?")[0] if company_url else None
-        else:
-            company_url = None
+            href = company_link.get_attribute("href")
+            if href and "/company/" in href:
+                company_url = href.split("?")[0]
+
+        # If not found, check the right panel's header
+        if not company_url:
+            # The right panel often has the company logo wrapped in an 'a' tag linking to the company
+            panel_link = page.locator(".job-details-jobs-unified-top-card__company-name a, .job-details-jobs-unified-top-card__primary-description a").first
+            if panel_link.count() > 0:
+                href = panel_link.get_attribute("href")
+                if href and "/company/" in href:
+                    company_url = href.split("?")[0]
+
+        # Final fallback: generic LinkedIn link in the detail panel
+        if not company_url:
+            # Look inside the right panel specifically for any company link
+            generic_link = page.locator("#job-details a[href*='/company/'], .job-view-layout a[href*='/company/']").first
+            if generic_link.count() > 0:
+                href = generic_link.get_attribute("href")
+                if href and "/company/" in href:
+                    company_url = href.split("?")[0]
 
         # Extract full description from the right panel
         desc_locator = page.locator("#job-details, .jobs-description").first
