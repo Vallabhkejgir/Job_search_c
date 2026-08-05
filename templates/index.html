@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkedIn Referral Agent Dashboard</title>
+    <!-- PicoCSS for lightweight styling -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <!-- HTMX for easy AJAX interactions -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        .table-container {
+            overflow-x: auto;
+            max-height: 400px;
+        }
+        td, th {
+            font-size: 0.9em;
+        }
+        .match-badge {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            color: white;
+        }
+        .match-yes { background-color: #2e7d32; }
+        .match-no { background-color: #c62828; }
+        #status-indicator { margin-left: 10px; font-weight: bold; }
+        .status-running { color: #f57f17; }
+        .status-stopped { color: #1565c0; }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <nav>
+            <ul>
+                <li><strong>LinkedIn Agent Dashboard</strong></li>
+            </ul>
+        </nav>
+
+        <section id="controls" style="margin-bottom: 2rem;">
+            <article>
+                <header>Agent Control</header>
+                <div style="display: flex; align-items: center;">
+                    <button
+                        hx-post="/api/run"
+                        hx-swap="none"
+                        onclick="setTimeout(() => htmx.trigger('#status-polling', 'updateStatus'), 500)"
+                        {% if is_running %}disabled{% endif %}
+                        id="run-btn">
+                        Run Agent
+                    </button>
+
+                    <span
+                        id="status-polling"
+                        hx-get="/api/status"
+                        hx-trigger="every 5s, updateStatus"
+                        style="display: none;">
+                        <!-- Hidden element that polls status -->
+                    </span>
+
+                    <span id="status-indicator" class="{% if is_running %}status-running{% else %}status-stopped{% endif %}">
+                        Status: {% if is_running %}Running...{% else %}Stopped{% endif %}
+                    </span>
+                </div>
+            </article>
+        </section>
+
+        <section id="data">
+            <article>
+                <header>Messaged Users (or Dry-Run Targets)</header>
+                <div class="table-container">
+                    <table role="grid">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Company</th>
+                                <th>Profile URL</th>
+                                <th>Job ID</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td>{{ user.name }}</td>
+                                <td>{{ user.company_name }}</td>
+                                <td><a href="{{ user.profile_url }}" target="_blank">View</a></td>
+                                <td>{{ user.job_id }}</td>
+                                <td>{{ user.messaged_at }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5">No users messaged yet.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </article>
+
+            <article>
+                <header>Evaluated Jobs</header>
+                <div class="table-container">
+                    <table role="grid">
+                        <thead>
+                            <tr>
+                                <th>Job Title</th>
+                                <th>Company</th>
+                                <th>Match?</th>
+                                <th>Reason</th>
+                                <th>Time Evaluated</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for job in jobs %}
+                            <tr>
+                                <td>{{ job.job_title }}</td>
+                                <td>{{ job.company_name }}</td>
+                                <td>
+                                    <span class="match-badge {% if job.is_match %}match-yes{% else %}match-no{% endif %}">
+                                        {% if job.is_match %}Yes{% else %}No{% endif %}
+                                    </span>
+                                </td>
+                                <td>{{ job.match_reason or '-' }}</td>
+                                <td>{{ job.processed_at }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5">No jobs evaluated yet.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </article>
+        </section>
+    </main>
+
+    <script>
+        // Custom logic to handle the JSON response from /api/status
+        // without overriding the entire DOM tree via standard HTMX swap
+        document.body.addEventListener('htmx:afterRequest', function(evt) {
+            if (evt.detail.requestConfig.path === '/api/status') {
+                const response = JSON.parse(evt.detail.xhr.response);
+                const indicator = document.getElementById('status-indicator');
+                const btn = document.getElementById('run-btn');
+
+                if (response.is_running) {
+                    indicator.textContent = "Status: Running...";
+                    indicator.className = "status-running";
+                    btn.disabled = true;
+                } else {
+                    indicator.textContent = "Status: Stopped";
+                    indicator.className = "status-stopped";
+                    btn.disabled = false;
+                }
+            }
+            if (evt.detail.requestConfig.path === '/api/run') {
+                if(evt.detail.successful) {
+                    alert("Agent started successfully!");
+                } else {
+                    const response = JSON.parse(evt.detail.xhr.response);
+                    alert("Error: " + response.message);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

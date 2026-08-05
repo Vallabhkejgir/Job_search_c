@@ -5,3 +5,7 @@ python-dotenv
 pydantic
 beautifulsoup4
 langchain-core
+fastapi
+uvicorn
+jinja2
+python-multipart
