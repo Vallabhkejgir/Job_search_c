@@ -31,7 +31,7 @@ def search_employees(page, company_url, company_name, target_titles):
     # Type the target titles into the "Search employees" input box
     try:
         keywords = " OR ".join([f'"{title}"' for title in target_titles])
-        search_input = page.locator("input[placeholder*='Search employees'], input#people-search-keywords").first
+        search_input = page.locator("input[placeholder*='Search employees'], input#people-search-keywords, input[aria-label*='Search employees']").first
         if search_input.count() > 0:
             search_input.fill(keywords)
             search_input.press("Enter")
@@ -73,11 +73,20 @@ def search_employees(page, company_url, company_name, target_titles):
             # The name is usually the bolded text or the only text
             name_text = link_locator.inner_text().strip()
 
-            # Clean up newlines or extra text (like "View profile")
-            name = name_text.split('\n')[0].strip() if name_text else "Unknown"
+            # Clean up newlines or extra text (like "is open to work" badges)
+            name = name_text.split('\n')[0].strip() if name_text else ""
+            if "open to work" in name.lower():
+                import re
+                name = re.sub(r"(?i)\s*(is\s+)?open\s+to\s+work.*", "", name).strip()
 
-            # Check if this link actually contains text (some are just image links)
-            # On the company page, the text link often contains the name.
+            # If inner_text was empty (e.g. image link), try extracting title or alt attribute
+            if not name:
+                img = link_locator.locator("img").first
+                if img.count() > 0:
+                    alt = img.get_attribute("alt") or ""
+                    if alt and "picture" not in alt.lower():
+                        name = alt.strip()
+
             if not name:
                 continue
 
@@ -92,27 +101,24 @@ def search_employees(page, company_url, company_name, target_titles):
                     parent_container = link_locator.locator("xpath=ancestor::div[contains(@class, 'org-people-profile-card') or contains(@class, 'entity-result__item')]").first
 
                 if parent_container.count() > 0:
-                    full_text = parent_container.inner_text().lower()
+                    container_text = parent_container.inner_text()
+                    lines = [line.strip() for line in container_text.split('\n') if line.strip()]
+                    if len(lines) > 0 and lines[0]:
+                        name = lines[0]
 
-                    # Try to get the specific headline
-                    headline_elem = parent_container.locator(".lt-line-clamp--multi-line, .artdeco-entity-lockup__subtitle").first
-                    if headline_elem.count() > 0:
-                        headline_text = headline_elem.inner_text().lower()
-                        # Verify the headline contains one of our target titles
-                        # Because the company search box might not perfectly filter
-                        matched_title = any(t.lower() in headline_text for t in target_titles)
-                        if not matched_title and len(target_titles) > 0:
-                            print(f"Skipping {name} - Headline '{headline_text}' does not match any target titles.")
-                            continue
+            # Clean up open to work or other extra text from name
+            if "open to work" in name.lower():
+                import re
+                name = re.sub(r"(?i)\s*(is\s+)?open\s+to\s+work.*", "", name).strip()
 
-                employees.append({
-                    "name": name,
-                    "profile_url": profile_url,
-                    "company": company_name
-                })
+            employees.append({
+                "name": name,
+                "profile_url": profile_url,
+                "company": company_name
+            })
 
-                if len(employees) >= 10:  # Collect up to 10 valid candidates
-                    break
+            if len(employees) >= 10:  # Collect up to 10 valid candidates
+                break
 
         except Exception as e:
             print(f"Error extracting profile: {e}")

@@ -27,7 +27,7 @@ def main():
         # Launch browser with saved session
         context = p.chromium.launch_persistent_context(
             user_data_dir=SESSION_DIR,
-            headless=False, # Often safer to run headful to avoid bot detection
+            headless=True,
             args=["--disable-blink-features=AutomationControlled"],
             viewport={"width": 1280, "height": 800}
         )
@@ -50,7 +50,7 @@ def main():
                 break
 
             # Dynamically locate the card to avoid stale element references if the DOM shifted
-            card = page.locator(".job-card-container").nth(i)
+            card = page.locator("a[href*='/jobs/view/']").nth(i)
 
             # Extract job details (this will return None and skip if already processed in DB)
             job = extract_job_from_card(page, card)
