@@ -3,46 +3,53 @@ import time
 import random
 from database import is_user_messaged, log_user_messaged
 
-def search_employees(page, company_name, target_titles):
+def search_employees(page, company_url, company_name, target_titles):
     """
-    Search for employees at a specific company with target titles.
+    Search for employees at a specific company with target titles by visiting the company's People tab.
     """
     print(f"Searching for employees at {company_name}...")
     employees = []
-    
-    # We construct a people search URL directly
-    # Keywords are target titles OR'd together
-    keywords = " OR ".join([f'"{title}"' for title in target_titles])
-    
-    # Simple search for the company and title keywords in people
-    search_query = f"{company_name} {keywords}"
-    encoded_query = urllib.parse.urlencode({"keywords": search_query})
-    search_url = f"https://www.linkedin.com/search/results/people/?{encoded_query}"
-    
-    page.goto(search_url)
-    page.wait_for_timeout(random.randint(3000, 5000))
-    
-    # Wait for results
-    try:
-        # Check standard container or fallbacks
-        try:
-            page.wait_for_selector(".reusable-search__result-container", timeout=10000)
-        except:
-            try:
-                page.wait_for_selector(".search-results-container", timeout=10000)
-            except:
-                page.wait_for_selector("a[href*='/in/']", timeout=10000)
-    except:
-        print(f"No employee results found for {company_name}")
+
+    if not company_url:
+        print(f"No company URL found for {company_name}. Cannot search their People tab.")
         return employees
 
-    # Scroll slightly
-    page.evaluate("window.scrollBy(0, 500)")
-    page.wait_for_timeout(1000)
+    # Ensure the company URL ends with a slash before appending "people/"
+    if not company_url.endswith("/"):
+        company_url += "/"
 
-    # Extract profiles. We use a broad locator that gets people links
-    # Then we walk up to the container, or just process the links directly
+    people_url = f"{company_url}people/"
+    print(f"Navigating to company people page: {people_url}")
+
+    try:
+        page.goto(people_url, wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(random.randint(3000, 5000))
+    except Exception as e:
+        print(f"Failed to load company people page: {e}")
+        return employees
+
+    # Type the target titles into the "Search employees" input box
+    try:
+        keywords = " OR ".join([f'"{title}"' for title in target_titles])
+        search_input = page.locator("input[placeholder*='Search employees'], input#people-search-keywords, input[aria-label*='Search employees']").first
+        if search_input.count() > 0:
+            search_input.fill(keywords)
+            search_input.press("Enter")
+            page.wait_for_timeout(random.randint(4000, 6000))
+        else:
+            print("Could not find the search box on the company People tab. Proceeding with raw list.")
+    except Exception as e:
+        print(f"Error interacting with company search box: {e}")
+
+    # Scroll slightly more aggressively to load all images/lazy loaded DOM elements
+    for _ in range(3):
+        page.evaluate("window.scrollBy(0, 1000)")
+        page.wait_for_timeout(1000)
+
+    # Extract profiles from the company people grid
+    # Usually the grid cards contain links to profiles
     profile_links = page.locator("a[href*='/in/']").all()
+    print(f"Found {len(profile_links)} profile links to evaluate on company page.")
 
     # Use a set to deduplicate since links often appear twice (image and text)
     seen_urls = set()
@@ -66,19 +73,52 @@ def search_employees(page, company_name, target_titles):
             # The name is usually the bolded text or the only text
             name_text = link_locator.inner_text().strip()
 
-            # Clean up newlines or extra text (like "View profile")
-            name = name_text.split('\n')[0].strip() if name_text else "Unknown"
+            # Clean up newlines or extra text (like "is open to work" badges)
+            name = name_text.split('\n')[0].strip() if name_text else ""
+            if "open to work" in name.lower():
+                import re
+                name = re.sub(r"(?i)\s*(is\s+)?open\s+to\s+work.*", "", name).strip()
+
+            # If inner_text was empty (e.g. image link), try extracting title or alt attribute
+            if not name:
+                img = link_locator.locator("img").first
+                if img.count() > 0:
+                    alt = img.get_attribute("alt") or ""
+                    if alt and "picture" not in alt.lower():
+                        name = alt.strip()
+
+            if not name:
+                continue
 
             # Don't add if it's not a real profile link or already messaged
-            if name and name != "LinkedIn Member" and "View" not in name and not is_user_messaged(profile_url):
-                employees.append({
-                    "name": name,
-                    "profile_url": profile_url,
-                    "company": company_name
-                })
+            if name != "LinkedIn Member" and "View" not in name and not is_user_messaged(profile_url):
+                # On the company page, we don't strictly need to check if they still work there
+                # because the "People" tab is specifically for current employees.
+                # However, it doesn't hurt to keep a sanity check if the DOM supports it.
+                parent_container = link_locator.locator("xpath=ancestor::li").first
+                if parent_container.count() == 0:
+                    # In company people grids, the container is often a div
+                    parent_container = link_locator.locator("xpath=ancestor::div[contains(@class, 'org-people-profile-card') or contains(@class, 'entity-result__item')]").first
 
-                if len(employees) >= 5:  # Top 5 max
-                    break
+                if parent_container.count() > 0:
+                    container_text = parent_container.inner_text()
+                    lines = [line.strip() for line in container_text.split('\n') if line.strip()]
+                    if len(lines) > 0 and lines[0]:
+                        name = lines[0]
+
+            # Clean up open to work or other extra text from name
+            if "open to work" in name.lower():
+                import re
+                name = re.sub(r"(?i)\s*(is\s+)?open\s+to\s+work.*", "", name).strip()
+
+            employees.append({
+                "name": name,
+                "profile_url": profile_url,
+                "company": company_name
+            })
+
+            if len(employees) >= 10:  # Collect up to 10 valid candidates
+                break
 
         except Exception as e:
             print(f"Error extracting profile: {e}")
