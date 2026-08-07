@@ -54,23 +54,20 @@ def main():
 
             jobs_evaluated_today += 1
 
-            # Evaluate with AI
-            evaluation = evaluate_job(job, config)
+            # Without AI evaluation, every job matching the search query is processed directly
+            match_reason = f"Relevant opening for {job['title']}"
+            target_titles = ["Recruiter", "Engineering Manager", "Hiring Manager"]
 
             # Log job
             log_job_processed(
                 job['job_id'],
                 job['title'],
                 job['company'],
-                evaluation.is_match,
-                evaluation.match_reason
+                True,
+                match_reason
             )
 
-            if not evaluation.is_match:
-                print(f"AI determined {job['company']} is NOT a match. Skipping.")
-                continue
-
-            print(f"AI MATCH! Reason: {evaluation.match_reason}")
+            print(f"Processing job match: {job['title']} at {job['company']}")
 
             # Check if we can still send messages
             if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
@@ -80,7 +77,7 @@ def main():
             # 3. Find employees using a dedicated worker tab
             worker_page = context.new_page()
             try:
-                employees = search_employees(worker_page, job.get('company_url'), job['company'], evaluation.target_titles)
+                employees = search_employees(worker_page, job.get('company_url'), job['company'], target_titles)
 
                 # 4. Message employees
                 messaged_for_this_company = 0
@@ -90,7 +87,7 @@ def main():
                     if messaged_for_this_company >= config.MAX_PEOPLE_PER_COMPANY:
                         break
 
-                    success = send_connection_request(worker_page, emp, job, evaluation.match_reason, config)
+                    success = send_connection_request(worker_page, emp, job, match_reason, config)
 
                     if success:
                         messages_sent_today += 1
