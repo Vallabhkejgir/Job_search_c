@@ -6,34 +6,45 @@ from bs4 import BeautifulSoup
 from database import is_job_processed
 
 
-def get_job_search_url(keywords, location, past_24_hours=True):
+def get_job_search_url(keywords, location, past_24_hours=True, start=0):
     base_url = "https://www.linkedin.com/jobs/search/?"
     params = {
         "keywords": keywords,
         "location": location,
         "f_TPR": "r86400" if past_24_hours else "", # r86400 is LinkedIn's code for past 24h (86400 seconds)
+        "start": start
     }
-    return base_url + urllib.parse.urlencode({k: v for k, v in params.items() if v})
+    return base_url + urllib.parse.urlencode({k: v for k, v in params.items() if v or k == "start"})
 
-def load_job_search_page(page, config):
+def load_job_search_page(page, config, start=0):
     """
     Navigates to the jobs page, scrolls to load all listings, and returns the total number of job cards found.
     """
-    url = get_job_search_url(config.SEARCH_KEYWORDS, config.SEARCH_LOCATION, config.PAST_24_HOURS_FILTER)
+    url = get_job_search_url(config.SEARCH_KEYWORDS, config.SEARCH_LOCATION, config.PAST_24_HOURS_FILTER, start)
     print(f"Navigating to job search: {url}")
 
     page.goto(url, wait_until="domcontentloaded", timeout=60000)
     page.wait_for_timeout(5000)
 
-    # Scroll the job list panel multiple times to trigger lazy-loading of all job cards
+    # Scroll the job list panel to trigger lazy-loading of all job cards
     print("Scrolling job search results to load all postings...")
-    for _ in range(8):
+    previous_count = 0
+    attempts_without_new_jobs = 0
+    
+    while attempts_without_new_jobs < 3:
         page.mouse.wheel(0, 1500)
         page.evaluate("""
             var element = document.querySelector('.jobs-search-results-list') || document.querySelector('main');
             if(element) element.scrollBy(0, 1500);
         """)
-        page.wait_for_timeout(random.randint(1000, 1500))
+        page.wait_for_timeout(random.randint(1500, 2500))
+        
+        current_count = page.locator("div._13225c48, span._983b42c3").count()
+        if current_count > previous_count:
+            previous_count = current_count
+            attempts_without_new_jobs = 0
+        else:
+            attempts_without_new_jobs += 1
 
     # Extract job card elements
     job_cards = page.locator("div._13225c48, span._983b42c3").all()

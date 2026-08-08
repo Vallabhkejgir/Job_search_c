@@ -32,6 +32,14 @@ def init_db():
     conn.commit()
     conn.close()
 
+def get_total_jobs_in_db():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM processed_jobs")
+    result = cursor.fetchone()[0]
+    conn.close()
+    return result
+
 def is_job_processed(job_id):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
