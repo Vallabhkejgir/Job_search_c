@@ -66,7 +66,7 @@ def extract_job_from_card(page, card):
         if first_line in ["Home", "Jobs", "Past 24 hours", "Remote", "Gen AI", "LLM", "Data", "Research & Development", "Easy Apply", "Experience level", "Employment type", "Company", "Under 10 applicants", "In my network", "How promoted jobs are ranked", "Are these results helpful?", "About the job", "See how you compare to other applicants"]:
             return None
 
-        if len(first_line) < 3 or first_line.startswith("Posted") or first_line.startswith("Be an early"):
+        if len(first_line) < 3 or first_line.startswith(("Posted", "Be an early")):
             return None
 
         title = first_line
@@ -79,7 +79,7 @@ def extract_job_from_card(page, card):
         try:
             card.scroll_into_view_if_needed(timeout=2000)
             card.click(timeout=2000)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
         page.wait_for_timeout(random.randint(1200, 2000))
 
@@ -130,7 +130,7 @@ def extract_job_from_card(page, card):
                 desc_container = about_h2.locator("xpath=parent::*/parent::*").first
                 if desc_container.count() > 0:
                     description = desc_container.inner_text().strip()
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
         if not description:
@@ -149,6 +149,6 @@ def extract_job_from_card(page, card):
             "url": f"https://www.linkedin.com/jobs/view/{job_id}"
         }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Error extracting job card: {e}")
         return None

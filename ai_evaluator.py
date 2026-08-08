@@ -76,7 +76,7 @@ Based on this information, provide:
         # we convert it to the Pydantic object
         return JobEvaluation(**result)
         
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Error evaluating job {job['job_id']} with AI: {e}")
         # Default fallback on error
         return JobEvaluation(

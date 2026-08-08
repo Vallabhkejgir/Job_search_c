@@ -4,7 +4,7 @@ from playwright.sync_api import sync_playwright
 
 import config
 from auth import SESSION_DIR
-from database import init_db, log_job_processed, get_total_jobs_in_db
+from database import get_total_jobs_in_db, init_db, log_job_processed
 from job_scraper import extract_job_from_card, load_job_search_page
 from messenger import search_employees, send_connection_request
 
