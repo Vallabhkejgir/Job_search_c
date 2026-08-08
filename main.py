@@ -35,11 +35,10 @@ def main():
         
         page = context.pages[0] if context.pages else context.new_page()
 
-        jobs_evaluated_today = 0
         total_jobs_found_in_run = 0
         start = 0
 
-        while True:
+        while start < 1000:
             # 1. Load Job Search Page
             num_cards = load_job_search_page(page, config, start)
             if num_cards == 0:
@@ -61,8 +60,6 @@ def main():
                 if not job:
                     continue
 
-                jobs_evaluated_today += 1
-
                 # Without AI evaluation, every job matching the search query is processed directly
                 match_reason = f"Relevant opening for {job['title']}"
                 target_titles = ["Recruiter", "Engineering Manager", "Hiring Manager"]
@@ -80,7 +77,7 @@ def main():
 
                 # Check if we can still send messages
                 if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
-                    print(f"Daily message limit ({config.MAX_MESSAGES_PER_DAY}) reached. Skipping messaging for {job['company']} but will continue evaluating jobs.")
+                    print(f"Daily message limit ({config.MAX_MESSAGES_PER_DAY}) reached. Skipping messaging for {job['company']} but will continue logging jobs.")
                     continue
 
                 # 3. Find employees using a dedicated worker tab
@@ -109,7 +106,7 @@ def main():
                 page.wait_for_timeout(1000)
 
             # Move to the next page
-            start += 25
+            start += num_cards
 
         total_jobs_in_db = get_total_jobs_in_db()
         print(f"Finished run. Jobs found in run: {total_jobs_found_in_run}. Total jobs in DB: {total_jobs_in_db}. Sent {messages_sent_today} messages.")
