@@ -1,7 +1,7 @@
-import urllib.parse
-import time
 import random
+
 from database import is_user_messaged, log_user_messaged
+
 
 def search_employees(page, company_url, company_name, target_titles):
     """

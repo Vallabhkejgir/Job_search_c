@@ -1,8 +1,10 @@
-import urllib.parse
-import time
 import random
+import urllib.parse
+
 from bs4 import BeautifulSoup
+
 from database import is_job_processed
+
 
 def get_job_search_url(keywords, location, past_24_hours=True):
     base_url = "https://www.linkedin.com/jobs/search/?"
@@ -66,7 +68,7 @@ def extract_job_from_card(page, card):
         try:
             card.scroll_into_view_if_needed(timeout=2000)
             card.click(timeout=2000)
-        except Exception as e:
+        except Exception:
             pass
         page.wait_for_timeout(random.randint(1200, 2000))
 
@@ -117,7 +119,7 @@ def extract_job_from_card(page, card):
                 desc_container = about_h2.locator("xpath=parent::*/parent::*").first
                 if desc_container.count() > 0:
                     description = desc_container.inner_text().strip()
-            except Exception as e:
+            except Exception:
                 pass
 
         if not description:

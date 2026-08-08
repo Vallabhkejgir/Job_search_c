@@ -1,12 +1,12 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-import subprocess
 import os
+import subprocess
 import sys
 
-from dashboard_db import get_all_processed_jobs, get_all_messaged_users
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
+
+from dashboard_db import get_all_messaged_users, get_all_processed_jobs
 
 app = FastAPI(title="LinkedIn Referral Agent Dashboard")
 

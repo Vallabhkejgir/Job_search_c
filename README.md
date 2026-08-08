@@ -1,10 +1,9 @@
 # LinkedIn Job Referral Agent
 
-An automated agent that searches for recent job postings on LinkedIn, evaluates them against your profile using AI, and automatically messages relevant company employees to request a referral.
+An automated agent that searches for recent job postings on LinkedIn and automatically messages relevant company employees to request a referral.
 
 ## Features
 - **Stealthy Browser Automation:** Uses Playwright with a persistent session to navigate LinkedIn securely.
-- **AI-Powered Evaluation:** Uses LangChain and OpenAI to read job descriptions and determine if you are a good fit.
 - **Automated Outreach:** Automatically drafts a personalized 300-character connection request and sends it to recruiters or engineering managers at the hiring company.
 - **Idempotent & Safe:** Uses SQLite to track processed jobs and messaged users so it never spams or duplicates effort. Respects strict rate limits.
 
@@ -19,7 +18,7 @@ An automated agent that searches for recent job postings on LinkedIn, evaluates 
    ```
 
 2. **Configure Environment**
-   Edit the `.env` file or `config.py` with your OpenAI API key, resume, and search preferences.
+   Edit the `.env` file or `config.py` with your search preferences.
    - Set `DRY_RUN=True` for testing.
 
 3. **Login & Save Session**

@@ -1,12 +1,13 @@
 import os
-import time
-import config
-from database import init_db, log_job_processed
-from auth import SESSION_DIR
-from job_scraper import load_job_search_page, extract_job_from_card
-from ai_evaluator import evaluate_job
-from messenger import search_employees, send_connection_request
+
 from playwright.sync_api import sync_playwright
+
+import config
+from auth import SESSION_DIR
+from database import init_db, log_job_processed
+from job_scraper import extract_job_from_card, load_job_search_page
+from messenger import search_employees, send_connection_request
+
 
 def main():
     print("=" * 50)
@@ -42,7 +43,7 @@ def main():
 
         jobs_evaluated_today = 0
 
-        # 2. Interleaved Process: Extract -> Evaluate -> Search Employees -> Message
+        # 2. Interleaved Process: Extract -> Search Employees -> Message
         for i in range(num_cards):
             # Dynamically locate card element in search results list
             card = page.locator("div._13225c48, span._983b42c3").nth(i)

@@ -1,6 +1,4 @@
 import sqlite3
-import os
-from datetime import datetime
 
 DB_NAME = "linkedin_agent.db"
 
