@@ -58,19 +58,19 @@ def main():
                 if card.count() == 0:
                     card = page.locator("div._13225c48, span._983b42c3").nth(i)
 
-                # Check limit BEFORE evaluating to prevent infinite skipping loops
+                # Check limit before processing
                 if companies_processed >= config.MAX_COMPANIES_TO_PROCESS:
                     print(f"Reached MAX_COMPANIES_TO_PROCESS limit ({config.MAX_COMPANIES_TO_PROCESS}). Stopping.")
                     break
                     
-                # We increment the counter here so that even if jobs are skipped (already in DB),
-                # we don't run indefinitely for 30+ minutes looking for new ones.
-                companies_processed += 1
 
                 # Extract job details (this will return None and skip if already processed in DB)
                 job = extract_job_from_card(page, card)
                 if not job:
                     continue
+
+                # Increment only when a company is actually processed for employee searches/messages
+                companies_processed += 1
 
                 # Without AI evaluation, every job matching the search query is processed directly
                 match_reason = f"Relevant opening for {job['title']}"
