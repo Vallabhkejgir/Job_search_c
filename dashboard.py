@@ -7,8 +7,13 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from dashboard_db import get_all_messaged_users, get_all_processed_jobs
+from database import init_db
 
 app = FastAPI(title="LinkedIn Referral Agent Dashboard")
+
+@app.on_event("startup")
+def startup_event():
+    init_db()
 
 # Ensure templates directory exists
 os.makedirs("templates", exist_ok=True)
@@ -45,9 +50,9 @@ async def run_agent():
     try:
         # Launch main.py as a background process using the current venv python
         python_executable = sys.executable
-        AGENT_PROCESS = subprocess.Popen([python_executable, "main.py"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        AGENT_PROCESS = subprocess.Popen([python_executable, "main.py"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # noqa: ASYNC220
         return {"status": "success", "message": "Agent started successfully in the background."}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 @app.get("/api/status")
