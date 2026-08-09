@@ -35,22 +35,27 @@ def load_job_search_page(page, config, start=0):
     while attempts_without_new_jobs < 3:
         page.mouse.wheel(0, 1500)
         page.evaluate("""
-            var element = document.querySelector('.jobs-search-results-list') || document.querySelector('main');
+            var element = document.querySelector('.jobs-search-results-list') || document.querySelector('main') || document.scrollingElement;
             if(element) element.scrollBy(0, 1500);
+            window.scrollBy(0, 1500);
         """)
         page.wait_for_timeout(random.randint(1500, 2500))
-        
-        current_count = page.locator("div.job-card-container, span._983b42c3, a[href*='/jobs/view/']").count()
+
+        current_count = page.locator("div.base-search-card, div.job-card-container, a[href*='/jobs/view/']").count()
         if current_count > previous_count:
             previous_count = current_count
             attempts_without_new_jobs = 0
         else:
             attempts_without_new_jobs += 1
 
-    job_cards = page.locator("a[href*='/jobs/view/']").all()
-    
+    # First try the newer/unauthenticated layout cards
+    job_cards = page.locator("div.base-search-card, div.job-search-card").all()
+
     if not job_cards:
-        job_cards = page.locator("div._13225c48, span._983b42c3").all()
+        job_cards = page.locator("a[href*='/jobs/view/']").all()
+
+    if not job_cards:
+        job_cards = page.locator("div.job-card-container, div._13225c48, span._983b42c3").all()
 
     print(f"Found {len(job_cards)} job cards on the page.")
     return len(job_cards)
@@ -66,26 +71,43 @@ def extract_job_from_card(page, card):
         page.wait_for_timeout(random.randint(1500, 2500))
 
         job_id = None
-        m = re.search(r"currentJobId=(\d+)", page.url)
-        if m:
-            job_id = m.group(1)
 
+        # 1. New UI: check data-entity-urn on the card
+        try:
+            urn = card.get_attribute("data-entity-urn", timeout=1000)
+            if urn and "jobPosting" in urn:
+                job_id = urn.split(":")[-1]
+        except Exception:
+            pass
+
+        # 2. Try URL matching
+        if not job_id:
+            m = re.search(r"currentJobId=(\d+)", page.url)
+            if m:
+                job_id = m.group(1)
+
+        # 3. Try getting it from the href slug
         if not job_id:
             try:
                 href = card.get_attribute("href", timeout=1000) or ""
                 if "/jobs/view/" in href:
-                    job_id = href.split("/jobs/view/")[1].split("/")[0].split("?")[0]
+                    # Match numeric ID at the end of the slug: ai-engineer-at-company-1234567890
+                    m = re.search(r"-(\d{9,11})\b", href)
+                    if m:
+                        job_id = m.group(1)
+                    else:
+                        job_id = href.split("/jobs/view/")[1].split("/")[0].split("?")[0]
             except Exception:
                 pass
-                
+
+        # 4. Try data-job-id attribute
         if not job_id:
             try:
                 job_id = card.get_attribute("data-job-id", timeout=1000)
             except Exception:
                 pass
 
-        # Extract basic info
-        job_id = card.get_attribute("data-job-id", timeout=1000)
+        # 5. Try finding it in page content
         if not job_id:
             html = page.content()
             m = re.search(r'"jobPosting":\{"jobPostingId":(\d+)', html)
@@ -98,28 +120,50 @@ def extract_job_from_card(page, card):
 
         # Fix Title Extraction for the new UI
         title = "Unknown Title"
-        
-        # Method 1: Get it from the header element containing the job view link in the main panel
+        company = "Unknown Company"
+        company_url = None
+
+        # New Unauthenticated Layout
         try:
-            job_title_link = page.locator("a[href*='/jobs/view/'] h2").first
-            if job_title_link.count() > 0:
-                title = job_title_link.inner_text().strip()
-            
-            # Method 2: Generic header check in the right panel
+            html = card.inner_html(timeout=1000)
+            soup = BeautifulSoup(html, "html.parser")
+
+            title_elem = soup.find(class_=lambda x: x and ("title" in x.lower() or "sr-only" in x.lower()))
+            if title_elem:
+                title = title_elem.get_text(strip=True)
+            else:
+                title = soup.get_text(strip=True)[:50]
+
+            comp_elem = soup.find(class_=lambda x: x and "subtitle" in x.lower())
+            if comp_elem:
+                company = comp_elem.get_text(strip=True)
+
+            comp_link = soup.find("a", href=lambda x: x and "/company/" in x)
+            if comp_link:
+                company_url = comp_link["href"].split("?")[0]
+        except Exception:
+            pass
+
+        # Old/Authenticated Layout fallbacks
+        try:
             if title == "Unknown Title" or not title:
-                possible_titles = page.locator("h1, h2.t-24, h2.jobs-details-top-card__job-title").all()
-                for t_elem in possible_titles:
-                    t_text = t_elem.inner_text().strip()
-                    if t_text and t_text not in ["About the job", "About the role"] and len(t_text) > 3:
-                        if "(Verified job)" not in t_text and "Selected" not in t_text:
-                            title = t_text
-                            break
-            
-            # Method 3: Try to extract it from the card text itself
-            if title == "Unknown Title" or not title:
-                card_text = card.inner_text().strip()
-                if card_text and len(card_text.split('\n')[0]) > 3:
-                    title = card_text.split('\n')[0].strip()
+                job_title_link = page.locator("a[href*='/jobs/view/'] h2").first
+                if job_title_link.count() > 0:
+                    title = job_title_link.inner_text().strip()
+
+                if title == "Unknown Title" or not title:
+                    possible_titles = page.locator("h1, h2.t-24, h2.jobs-details-top-card__job-title").all()
+                    for t_elem in possible_titles:
+                        t_text = t_elem.inner_text().strip()
+                        if t_text and t_text not in ["About the job", "About the role"] and len(t_text) > 3:
+                            if "(Verified job)" not in t_text and "Selected" not in t_text:
+                                title = t_text
+                                break
+
+                if title == "Unknown Title" or not title:
+                    card_text = card.inner_text().strip()
+                    if card_text and len(card_text.split('\n')[0]) > 3:
+                        title = card_text.split('\n')[0].strip()
         except Exception:
             pass
 
@@ -132,16 +176,15 @@ def extract_job_from_card(page, card):
             print(f"Skipping job {job_id} - already processed.")
             return None
 
-        # Extract company name
-        company = "Unknown Company"
-        company_url = None
-        
         try:
-            company_link = page.locator("a[href*=\"/company/\"]").first
-            if company_link.count() > 0:
-                href = company_link.get_attribute("href", timeout=1000)
-                if href and "/company/" in href:
-                    company_url = href.split("?")[0]
+            if company == "Unknown Company" or not company_url:
+                company_link = page.locator("a[href*=\"/company/\"]").first
+                if company_link.count() > 0:
+                    href = company_link.get_attribute("href", timeout=1000)
+                    if href and "/company/" in href:
+                        company_url = href.split("?")[0]
+                        if company == "Unknown Company":
+                            company = company_link.inner_text().strip()
         except Exception:
             pass
 

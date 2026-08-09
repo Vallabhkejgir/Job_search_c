@@ -54,9 +54,11 @@ def main():
             # 2. Interleaved Process: Extract -> Search Employees -> Message
             for i in range(num_cards):
                 # Dynamically locate card element in search results list
-                card = page.locator("a[href*='/jobs/view/']").nth(i)
+                card = page.locator("div.base-search-card, div.job-search-card").nth(i)
                 if card.count() == 0:
-                    card = page.locator("div._13225c48, span._983b42c3").nth(i)
+                    card = page.locator("a[href*='/jobs/view/']").nth(i)
+                if card.count() == 0:
+                    card = page.locator("div.job-card-container, div._13225c48, span._983b42c3").nth(i)
 
                 # Check limit before processing
                 if companies_processed >= config.MAX_COMPANIES_TO_PROCESS:
