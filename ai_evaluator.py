@@ -1,7 +1,8 @@
-from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.prompts import PromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
+
 
 class JobEvaluation(BaseModel):
     is_match: bool = Field(description="Whether the job is a good fit for the user based on their resume and preferences.")
@@ -75,7 +76,7 @@ Based on this information, provide:
         # we convert it to the Pydantic object
         return JobEvaluation(**result)
         
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Error evaluating job {job['job_id']} with AI: {e}")
         # Default fallback on error
         return JobEvaluation(

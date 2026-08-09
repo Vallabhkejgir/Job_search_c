@@ -1,6 +1,8 @@
-from typing import List, Dict, Any
 import sqlite3
+from typing import Any
+
 from database import DB_NAME
+
 
 def dict_factory(cursor, row):
     d = {}
@@ -8,7 +10,7 @@ def dict_factory(cursor, row):
         d[col[0]] = row[idx]
     return d
 
-def get_all_processed_jobs() -> List[Dict[str, Any]]:
+def get_all_processed_jobs() -> list[dict[str, Any]]:
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = dict_factory
     cursor = conn.cursor()
@@ -17,7 +19,7 @@ def get_all_processed_jobs() -> List[Dict[str, Any]]:
     conn.close()
     return results
 
-def get_all_messaged_users() -> List[Dict[str, Any]]:
+def get_all_messaged_users() -> list[dict[str, Any]]:
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = dict_factory
     cursor = conn.cursor()
@@ -25,3 +27,19 @@ def get_all_messaged_users() -> List[Dict[str, Any]]:
     results = cursor.fetchall()
     conn.close()
     return results
+    
+def get_job_count() -> int:
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM processed_jobs")
+    result = cursor.fetchone()[0]
+    conn.close()
+    return result
+    
+def get_messaged_users_count() -> int:
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM messaged_users")
+    result = cursor.fetchone()[0]
+    conn.close()
+    return result

@@ -1,7 +1,7 @@
-import urllib.parse
-import time
 import random
+
 from database import is_user_messaged, log_user_messaged
+
 
 def search_employees(page, company_url, company_name, target_titles):
     """
@@ -24,7 +24,7 @@ def search_employees(page, company_url, company_name, target_titles):
     try:
         page.goto(people_url, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(random.randint(3000, 5000))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Failed to load company people page: {e}")
         return employees
 
@@ -38,7 +38,7 @@ def search_employees(page, company_url, company_name, target_titles):
             page.wait_for_timeout(random.randint(4000, 6000))
         else:
             print("Could not find the search box on the company People tab. Proceeding with raw list.")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Error interacting with company search box: {e}")
 
     # Scroll slightly more aggressively to load all images/lazy loaded DOM elements
@@ -120,7 +120,7 @@ def search_employees(page, company_url, company_name, target_titles):
             if len(employees) >= 10:  # Collect up to 10 valid candidates
                 break
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error extracting profile: {e}")
 
     print(f"Found {len(employees)} potential contacts at {company_name}.")
@@ -198,6 +198,6 @@ def send_connection_request(page, employee, job, ai_pitch, config):
             print("Could not find 'Add a note' button.")
             return False
             
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Error sending message to {employee['name']}: {e}")
         return False

@@ -29,6 +29,33 @@
         #status-indicator { margin-left: 10px; font-weight: bold; }
         .status-running { color: #f57f17; }
         .status-stopped { color: #1565c0; }
+        .stats-container {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .stat-card {
+            background-color: #f1f8e9;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            border: 1px solid #c5e1a5;
+            text-align: center;
+            flex: 1;
+        }
+        .stat-card.users-stat {
+            background-color: #e3f2fd;
+            border: 1px solid #90caf9;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.2rem;
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            color: #555;
+            text-transform: uppercase;
+        }
     </style>
 </head>
 <body>
@@ -42,7 +69,19 @@
         <section id="controls" style="margin-bottom: 2rem;">
             <article>
                 <header>Agent Control</header>
-                <div style="display: flex; align-items: center;">
+                
+                <div class="stats-container">
+                    <div class="stat-card">
+                        <div class="stat-value">{{ total_jobs }}</div>
+                        <div class="stat-label">Jobs Evaluated</div>
+                    </div>
+                    <div class="stat-card users-stat">
+                        <div class="stat-value">{{ total_users }}</div>
+                        <div class="stat-label">People Messaged</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; margin-top: 1rem;">
                     <button
                         hx-post="/api/run"
                         hx-swap="none"

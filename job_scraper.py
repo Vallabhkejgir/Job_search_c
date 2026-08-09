@@ -1,154 +1,166 @@
-import urllib.parse
-import time
 import random
+import urllib.parse
+import re
+
 from bs4 import BeautifulSoup
+
 from database import is_job_processed
 
-def get_job_search_url(keywords, location, past_24_hours=True):
+def get_job_search_url(keywords, location, past_24_hours=True, start=0):
     base_url = "https://www.linkedin.com/jobs/search/?"
     params = {
         "keywords": keywords,
         "location": location,
-        "f_TPR": "r86400" if past_24_hours else "", # r86400 is LinkedIn's code for past 24h (86400 seconds)
+        "f_TPR": "r86400" if past_24_hours else "",
+        "start": start
     }
-    return base_url + urllib.parse.urlencode({k: v for k, v in params.items() if v})
+    return base_url + urllib.parse.urlencode({k: v for k, v in params.items() if v or k == "start"})
 
-def load_job_search_page(page, config):
+def load_job_search_page(page, config, start=0):
     """
-    Navigates to the jobs page, scrolls to load listings, and returns the total number of job cards found.
+    Navigates to the jobs page, scrolls to load all listings, and returns the total number of job links found.
     """
-    url = get_job_search_url(config.SEARCH_KEYWORDS, config.SEARCH_LOCATION, config.PAST_24_HOURS_FILTER)
+    url = get_job_search_url(config.SEARCH_KEYWORDS, config.SEARCH_LOCATION, config.PAST_24_HOURS_FILTER, start)
     print(f"Navigating to job search: {url}")
 
     # Use domcontentloaded or a longer timeout for the heavy LinkedIn jobs page
     page.goto(url, wait_until="domcontentloaded", timeout=60000)
     page.wait_for_timeout(random.randint(3000, 5000))
 
-    # Wait for job list container
-    try:
-        # Fallback selectors for different LinkedIn layouts
-        try:
-            page.wait_for_selector(".scaffold-layout__list", timeout=5000)
-        except:
-            try:
-                page.wait_for_selector(".scaffold-layout__list-container", timeout=5000)
-            except:
-                try:
-                    page.wait_for_selector(".job-card-container", timeout=5000)
-                except:
-                    # In newer LinkedIn UI layouts, job items are loaded inside the main results panel
-                    page.wait_for_selector("a[href*='/jobs/view/'], div[class*='jobs-search'], main", timeout=5000)
-    except Exception as e:
-        print("Could not find job list container. Maybe no results or blocked by captcha/login wall.")
-        return 0
-
-    # Scroll the job list panel to load more jobs (LinkedIn uses lazy loading)
-    for _ in range(8):
+    # Scroll the job list panel to trigger lazy-loading of all job cards
+    print("Scrolling job search results to load all postings...")
+    previous_count = 0
+    attempts_without_new_jobs = 0
+    
+    while attempts_without_new_jobs < 3:
+        page.mouse.wheel(0, 1500)
         page.evaluate("""
             var element = document.querySelector('.jobs-search-results-list') || document.querySelector('main');
             if(element) element.scrollBy(0, 1500);
         """)
         page.wait_for_timeout(random.randint(1500, 2500))
+        
+        current_count = page.locator("div.job-card-container, span._983b42c3, a[href*='/jobs/view/']").count()
+        if current_count > previous_count:
+            previous_count = current_count
+            attempts_without_new_jobs = 0
+        else:
+            attempts_without_new_jobs += 1
 
-    # Extract job cards (support both legacy class and clickable links / containers in new UI)
-    job_cards_count = page.locator("a[href*='/jobs/view/']").count()
-    print(f"Found {job_cards_count} job cards on the page.")
-    return job_cards_count
+    job_cards = page.locator("a[href*='/jobs/view/']").all()
+    
+    if not job_cards:
+        job_cards = page.locator("div._13225c48, span._983b42c3").all()
+
+    print(f"Found {len(job_cards)} job cards on the page.")
+    return len(job_cards)
 
 def extract_job_from_card(page, card):
     try:
-        # Extract title and info BEFORE clicking
-        title = "Unknown Title"
         try:
-            raw_txt = card.inner_text().strip()
-            if raw_txt and raw_txt not in ["On-site", "Full-time", "Hybrid", "Remote", "Easy Apply"]:
-                title = raw_txt
-        except Exception as e:
+            card.scroll_into_view_if_needed(timeout=2000)
+            card.click(timeout=2000, force=True)
+        except Exception:  # noqa: BLE001, S110
             pass
+            
+        page.wait_for_timeout(random.randint(1500, 2500))
+
+        job_id = None
+        m = re.search(r"currentJobId=(\d+)", page.url)
+        if m:
+            job_id = m.group(1)
+
+        if not job_id:
+            try:
+                href = card.get_attribute("href") or ""
+                if "/jobs/view/" in href:
+                    job_id = href.split("/jobs/view/")[1].split("/")[0].split("?")[0]
+            except Exception:
+                pass
+                
+        if not job_id:
+            try:
+                job_id = card.get_attribute("data-job-id")
+            except Exception:
+                pass
 
         # Extract basic info
         job_id = card.get_attribute("data-job-id")
         if not job_id:
-            # Fallback to extract job ID from href if element is an <a> tag
-            href = card.get_attribute("href") or ""
-            if "/jobs/view/" in href:
-                job_id = href.split("/jobs/view/")[1].split("/")[0].split("?")[0]
-            elif "currentJobId=" in href:
-                import re
-                m = re.search(r"currentJobId=(\d+)", href)
-                if m:
-                    job_id = m.group(1)
-
-        # Click the card to load details on the right panel
-        card.scroll_into_view_if_needed()
-        card.click()
-        page.wait_for_timeout(random.randint(2000, 3500))
-
-        if not job_id:
-            # Fallback: inspect page URL or right panel for job ID
-            import re
-            m = re.search(r"currentJobId=(\d+)", page.url)
+            html = page.content()
+            m = re.search(r'"jobPosting":\{"jobPostingId":(\d+)', html)
             if m:
                 job_id = m.group(1)
 
         if not job_id:
+            print("Could not find job ID.")
             return None
+
+        # Fix Title Extraction for the new UI
+        title = "Unknown Title"
+        
+        # Method 1: Get it from the header element containing the job view link in the main panel
+        try:
+            job_title_link = page.locator("a[href*='/jobs/view/'] h2").first
+            if job_title_link.count() > 0:
+                title = job_title_link.inner_text().strip()
+            
+            # Method 2: Generic header check in the right panel
+            if title == "Unknown Title" or not title:
+                possible_titles = page.locator("h1, h2.t-24, h2.jobs-details-top-card__job-title").all()
+                for t_elem in possible_titles:
+                    t_text = t_elem.inner_text().strip()
+                    if t_text and t_text not in ["About the job", "About the role"] and len(t_text) > 3:
+                        if "(Verified job)" not in t_text and "Selected" not in t_text:
+                            title = t_text
+                            break
+            
+            # Method 3: Try to extract it from the card text itself
+            if title == "Unknown Title" or not title:
+                card_text = card.inner_text().strip()
+                if card_text and len(card_text.split('\n')[0]) > 3:
+                    title = card_text.split('\n')[0].strip()
+        except Exception:
+            pass
+
+        if "Selected," in title:
+            title = title.replace("Selected,", "").strip()
+        if "(Verified job)" in title:
+            title = title.replace("(Verified job)", "").strip()
 
         if is_job_processed(job_id):
             print(f"Skipping job {job_id} - already processed.")
             return None
 
-        if title == "Unknown Title" or not title:
-            # Fallback to the span class containing the title in the new UI
-            span_elem = page.locator("span._983b42c3").first
-            if span_elem.count() > 0:
-                raw_t = span_elem.inner_text().strip()
-                if "Selected," in raw_t:
-                    raw_t = raw_t.replace("Selected,", "").strip()
-                if "(Verified job)" in raw_t:
-                    raw_t = raw_t.replace("(Verified job)", "").strip()
-                title = raw_t
-
-        company_elem = page.locator(".job-details-jobs-unified-top-card__company-name, .job-details-jobs-unified-top-card__primary-description, a[href*='/company/']").first
-        company = company_elem.inner_text().strip() if company_elem.count() > 0 else "Unknown Company"
-
-        # Attempt to extract company URL from the card first
-        company_link = company_elem.locator("a").first
+        # Extract company name
+        company = "Unknown Company"
         company_url = None
         if company_link.count() > 0:
             href = company_link.get_attribute("href")
             if href and "/company/" in href:
                 company_url = href.split("?")[0]
 
-        # If not found, check the right panel's header
-        if not company_url:
-            # The right panel often has the company logo wrapped in an 'a' tag linking to the company
-            panel_link = page.locator(".job-details-jobs-unified-top-card__company-name a, .job-details-jobs-unified-top-card__primary-description a").first
-            if panel_link.count() > 0:
-                href = panel_link.get_attribute("href")
-                if href and "/company/" in href:
-                    company_url = href.split("?")[0]
+        # Extract full job description
+        description = ""
+        about_h2 = page.locator("h2:has-text('About the job'), h2:has-text('About the role')").first
+        if about_h2.count() > 0:
+            try:
+                desc_container = about_h2.locator("xpath=parent::*/parent::*").first
+                if desc_container.count() > 0:
+                    description = desc_container.inner_text().strip()
+            except Exception:  # noqa: BLE001, S110
+                pass
 
-        # Final fallback: generic LinkedIn link in the detail panel
-        if not company_url:
-            # Look inside the right panel specifically for any company link
-            generic_link = page.locator("#job-details a[href*='/company/'], .job-view-layout a[href*='/company/']").first
-            if generic_link.count() > 0:
-                href = generic_link.get_attribute("href")
-                if href and "/company/" in href:
-                    company_url = href.split("?")[0]
+        if not description:
+            desc_elem = page.locator("#job-details, .jobs-description, .jobs-search__job-details").first
+            if desc_elem.count() > 0:
+                soup = BeautifulSoup(desc_elem.inner_html(), "html.parser")
+                description = soup.get_text(separator="\n", strip=True)
 
-        # Extract full description from the right panel
-        desc_locator = page.locator("#job-details, .jobs-description").first
-        if desc_locator.count() > 0:
-            # Use BeautifulSoup to get clean text without tons of HTML tags
-            html_content = desc_locator.inner_html()
-            soup = BeautifulSoup(html_content, "html.parser")
-            description = soup.get_text(separator="\n", strip=True)
-        else:
-            description = ""
+        if title == "Unknown Title" and company == "Unknown Company":
+            return None
 
-        print(f"Extracted: {title} at {company}")
+        print(f"Extracted: {title} at {company} (ID: {job_id})")
         return {
             "job_id": job_id,
             "title": title,
@@ -158,6 +170,6 @@ def extract_job_from_card(page, card):
             "url": f"https://www.linkedin.com/jobs/view/{job_id}"
         }
 
-    except Exception as e:
-        print(f"Error extracting a job card: {e}")
+    except Exception as e:  # noqa: BLE001
+        print(f"Error extracting job card: {e}")
         return None

@@ -1,12 +1,13 @@
 import os
-import time
-import config
-from database import init_db, log_job_processed
-from auth import SESSION_DIR
-from job_scraper import load_job_search_page, extract_job_from_card
-from ai_evaluator import evaluate_job
-from messenger import search_employees, send_connection_request
+
 from playwright.sync_api import sync_playwright
+
+import config
+from auth import SESSION_DIR
+from database import get_total_jobs_in_db, init_db, log_job_processed
+from job_scraper import extract_job_from_card, load_job_search_page
+from messenger import search_employees, send_connection_request
+
 
 def main():
     print("=" * 50)
@@ -34,80 +35,81 @@ def main():
         
         page = context.pages[0] if context.pages else context.new_page()
 
-        # 1. Load Job Search Page
-        num_cards = load_job_search_page(page, config)
-        if num_cards == 0:
-            print("No jobs found or unable to load job search page.")
-            return
+        total_jobs_found_in_run = 0
+        start = 0
 
-        TARGET_EVALUATIONS = 15
-        jobs_evaluated_today = 0
-
-        # 2. Interleaved Process: Extract -> Evaluate -> Search Employees -> Message
-        for i in range(num_cards):
-            if jobs_evaluated_today >= TARGET_EVALUATIONS:
-                print(f"Reached target of {TARGET_EVALUATIONS} new evaluations. Stopping.")
+        while start < 1000:
+            # 1. Load Job Search Page
+            num_cards = load_job_search_page(page, config, start)
+            if num_cards == 0:
+                if start == 0:
+                    print("No jobs found or unable to load job search page.")
+                else:
+                    print("No more jobs found.")
                 break
+                
+            total_jobs_found_in_run += num_cards
 
-            # Dynamically locate the card to avoid stale element references if the DOM shifted
-            card = page.locator("a[href*='/jobs/view/']").nth(i)
+            # 2. Interleaved Process: Extract -> Search Employees -> Message
+            for i in range(num_cards):
+                # Dynamically locate card element in search results list
+                card = page.locator("div._13225c48, span._983b42c3").nth(i)
 
-            # Extract job details (this will return None and skip if already processed in DB)
-            job = extract_job_from_card(page, card)
-            if not job:
-                continue
+                # Extract job details (this will return None and skip if already processed in DB)
+                job = extract_job_from_card(page, card)
+                if not job:
+                    continue
 
-            jobs_evaluated_today += 1
+                # Without AI evaluation, every job matching the search query is processed directly
+                match_reason = f"Relevant opening for {job['title']}"
+                target_titles = ["Recruiter", "Engineering Manager", "Hiring Manager"]
 
-            # Evaluate with AI
-            evaluation = evaluate_job(job, config)
+                # Log job
+                log_job_processed(
+                    job['job_id'],
+                    job['title'],
+                    job['company'],
+                    True,
+                    match_reason
+                )
 
-            # Log job
-            log_job_processed(
-                job['job_id'],
-                job['title'],
-                job['company'],
-                evaluation.is_match,
-                evaluation.match_reason
-            )
+                print(f"Processing job match: {job['title']} at {job['company']}")
 
-            if not evaluation.is_match:
-                print(f"AI determined {job['company']} is NOT a match. Skipping.")
-                continue
+                # Check if we can still send messages
+                if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
+                    print(f"Daily message limit ({config.MAX_MESSAGES_PER_DAY}) reached. Skipping messaging for {job['company']} but will continue logging jobs.")
+                    continue
 
-            print(f"AI MATCH! Reason: {evaluation.match_reason}")
+                # 3. Find employees using a dedicated worker tab
+                worker_page = context.new_page()
+                try:
+                    employees = search_employees(worker_page, job.get('company_url'), job['company'], target_titles)
 
-            # Check if we can still send messages
-            if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
-                print(f"Daily message limit ({config.MAX_MESSAGES_PER_DAY}) reached. Skipping messaging for {job['company']} but will continue evaluating jobs.")
-                continue
+                    # 4. Message employees
+                    messaged_for_this_company = 0
+                    for emp in employees:
+                        if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
+                            break
+                        if messaged_for_this_company >= config.MAX_PEOPLE_PER_COMPANY:
+                            break
 
-            # 3. Find employees using a dedicated worker tab
-            worker_page = context.new_page()
-            try:
-                employees = search_employees(worker_page, job.get('company_url'), job['company'], evaluation.target_titles)
+                        success = send_connection_request(worker_page, emp, job, match_reason, config)
 
-                # 4. Message employees
-                messaged_for_this_company = 0
-                for emp in employees:
-                    if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
-                        break
-                    if messaged_for_this_company >= config.MAX_PEOPLE_PER_COMPANY:
-                        break
+                        if success:
+                            messages_sent_today += 1
+                            messaged_for_this_company += 1
+                finally:
+                    worker_page.close()
 
-                    success = send_connection_request(worker_page, emp, job, evaluation.match_reason, config)
+                # Return to the main tab context visually (optional, Playwright handles it internally)
+                page.bring_to_front()
+                page.wait_for_timeout(1000)
 
-                    if success:
-                        messages_sent_today += 1
-                        messaged_for_this_company += 1
-            finally:
-                worker_page.close()
+            # Move to the next page
+            start += num_cards
 
-            # Return to the main tab context visually (optional, Playwright handles it internally)
-            page.bring_to_front()
-            page.wait_for_timeout(1000)
-
-        print(f"Finished run. Sent {messages_sent_today} messages.")
+        total_jobs_in_db = get_total_jobs_in_db()
+        print(f"Finished run. Jobs found in run: {total_jobs_found_in_run}. Total jobs in DB: {total_jobs_in_db}. Sent {messages_sent_today} messages.")
         context.close()
 
 if __name__ == "__main__":
