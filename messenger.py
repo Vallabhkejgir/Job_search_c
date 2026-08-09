@@ -14,10 +14,11 @@ def search_employees(page, company_url, company_name, target_titles):
         print(f"No company URL found for {company_name}. Cannot search their People tab.")
         return employees
 
-    # Clean company URL to ensure base /company/<slug>/ format before appending "people/"
-    import re
-    company_url = re.sub(r"/(life|about|jobs|people|posts)/?$", "", company_url).rstrip("/")
-    people_url = f"{company_url}/people/"
+    # Ensure the company URL ends with a slash before appending "people/"
+    if not company_url.endswith("/"):
+        company_url += "/"
+
+    people_url = f"{company_url}people/"
     print(f"Navigating to company people page: {people_url}")
 
     try:
@@ -72,14 +73,8 @@ def search_employees(page, company_url, company_name, target_titles):
             # The name is usually the bolded text or the only text
             name_text = link_locator.inner_text().strip()
 
-            # Clean up newlines or extra text (like "is open to work" badges or social proof)
-            lines = [l.strip() for l in name_text.split('\n') if l.strip()]
-            name = ""
-            for l in lines:
-                if not any(bad in l.lower() for bad in ["follows", "connection", "mutual", "school alumni", "member"]):
-                    name = l
-                    break
-
+            # Clean up newlines or extra text (like "is open to work" badges)
+            name = name_text.split('\n')[0].strip() if name_text else ""
             if "open to work" in name.lower():
                 import re
                 name = re.sub(r"(?i)\s*(is\s+)?open\s+to\s+work.*", "", name).strip()

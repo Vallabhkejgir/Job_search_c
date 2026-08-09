@@ -23,8 +23,9 @@ def load_job_search_page(page, config, start=0):
     url = get_job_search_url(config.SEARCH_KEYWORDS, config.SEARCH_LOCATION, config.PAST_24_HOURS_FILTER, start)
     print(f"Navigating to job search: {url}")
 
+    # Use domcontentloaded or a longer timeout for the heavy LinkedIn jobs page
     page.goto(url, wait_until="domcontentloaded", timeout=60000)
-    page.wait_for_timeout(5000)
+    page.wait_for_timeout(random.randint(3000, 5000))
 
     # Scroll the job list panel to trigger lazy-loading of all job cards
     print("Scrolling job search results to load all postings...")
@@ -83,6 +84,8 @@ def extract_job_from_card(page, card):
             except Exception:
                 pass
 
+        # Extract basic info
+        job_id = card.get_attribute("data-job-id")
         if not job_id:
             html = page.content()
             m = re.search(r'"jobPosting":\{"jobPostingId":(\d+)', html)
@@ -126,18 +129,13 @@ def extract_job_from_card(page, card):
             title = title.replace("(Verified job)", "").strip()
 
         if is_job_processed(job_id):
-            print(f"Skipping job {job_id} ({title}) - already processed.")
+            print(f"Skipping job {job_id} - already processed.")
             return None
 
         # Extract company name
         company = "Unknown Company"
         company_url = None
-
-        company_link = page.locator("a[href*='/company/']").first
         if company_link.count() > 0:
-            c_text = company_link.inner_text().strip()
-            if c_text:
-                company = c_text
             href = company_link.get_attribute("href")
             if href and "/company/" in href:
                 company_url = href.split("?")[0]
