@@ -20,6 +20,7 @@ An automated agent that searches for recent job postings on LinkedIn and automat
 2. **Configure Environment**
    Edit the `.env` file or `config.py` with your search preferences.
    - Set `DRY_RUN=True` for testing.
+   - Set `MAX_COMPANIES_TO_PROCESS` to limit the number of companies processed per run (default: 50).
 
 3. **Login & Save Session**
    ```bash
