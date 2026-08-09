@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
-from dashboard_db import get_all_messaged_users, get_all_processed_jobs
+from dashboard_db import get_all_messaged_users, get_all_processed_jobs, get_job_count, get_messaged_users_count
 from database import init_db
 
 app = FastAPI(title="LinkedIn Referral Agent Dashboard")
@@ -26,6 +26,9 @@ AGENT_PROCESS = None
 async def read_root(request: Request):
     jobs = get_all_processed_jobs()
     users = get_all_messaged_users()
+    
+    total_jobs = get_job_count()
+    total_users = get_messaged_users_count()
 
     is_running = AGENT_PROCESS is not None and AGENT_PROCESS.poll() is None
 
@@ -35,6 +38,8 @@ async def read_root(request: Request):
         context={
             "jobs": jobs,
             "users": users,
+            "total_jobs": total_jobs,
+            "total_users": total_users,
             "is_running": is_running
         }
     )

@@ -11,11 +11,12 @@ LLM_MODEL = os.getenv("LLM_MODEL", "gemini-flash-latest")
 # Job Search Configuration
 SEARCH_KEYWORDS = os.getenv("SEARCH_KEYWORDS", "Software Engineer")
 SEARCH_LOCATION = os.getenv("SEARCH_LOCATION", "United States")
-PAST_24_HOURS_FILTER = True
+PAST_24_HOURS_FILTER = False # 2. Ensure no limit to get jobs over past 24 hours
 
 # Limits & Safety (crucial for LinkedIn)
-MAX_MESSAGES_PER_DAY = int(os.getenv("MAX_MESSAGES_PER_DAY", "10"))
-MAX_PEOPLE_PER_COMPANY = int(os.getenv("MAX_PEOPLE_PER_COMPANY", "3"))
+# 1. Remove limit to message number of people
+MAX_MESSAGES_PER_DAY = float('inf') 
+MAX_PEOPLE_PER_COMPANY = float('inf')
 
 # Agent Mode
 DRY_RUN = os.getenv("DRY_RUN", "True").lower() in ("true", "1", "t")

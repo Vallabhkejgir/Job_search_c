@@ -27,3 +27,19 @@ def get_all_messaged_users() -> list[dict[str, Any]]:
     results = cursor.fetchall()
     conn.close()
     return results
+    
+def get_job_count() -> int:
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM processed_jobs")
+    result = cursor.fetchone()[0]
+    conn.close()
+    return result
+    
+def get_messaged_users_count() -> int:
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM messaged_users")
+    result = cursor.fetchone()[0]
+    conn.close()
+    return result
