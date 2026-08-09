@@ -7,8 +7,13 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from dashboard_db import get_all_messaged_users, get_all_processed_jobs
+from database import init_db
 
 app = FastAPI(title="LinkedIn Referral Agent Dashboard")
+
+@app.on_event("startup")
+def startup_event():
+    init_db()
 
 # Ensure templates directory exists
 os.makedirs("templates", exist_ok=True)
