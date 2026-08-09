@@ -17,6 +17,7 @@ PAST_24_HOURS_FILTER = False # 2. Ensure no limit to get jobs over past 24 hours
 # 1. Remove limit to message number of people
 MAX_MESSAGES_PER_DAY = float('inf') 
 MAX_PEOPLE_PER_COMPANY = float('inf')
+MAX_COMPANIES_TO_PROCESS = int(os.getenv('MAX_COMPANIES_TO_PROCESS', '50'))
 
 # Agent Mode
 DRY_RUN = os.getenv("DRY_RUN", "True").lower() in ("true", "1", "t")

@@ -135,6 +135,7 @@ def extract_job_from_card(page, card):
         # Extract company name
         company = "Unknown Company"
         company_url = None
+        company_link = page.locator("a[href*=\"/company/\"]").first
         if company_link.count() > 0:
             href = company_link.get_attribute("href")
             if href and "/company/" in href:
