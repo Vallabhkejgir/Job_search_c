@@ -37,6 +37,7 @@ def main():
 
         total_jobs_found_in_run = 0
         start = 0
+        companies_processed = 0
 
         while start < 1000:
             # 1. Load Job Search Page
@@ -59,6 +60,10 @@ def main():
                 job = extract_job_from_card(page, card)
                 if not job:
                     continue
+                
+                if companies_processed >= config.MAX_COMPANIES_TO_PROCESS:
+                    print(f"Reached MAX_COMPANIES_TO_PROCESS limit ({config.MAX_COMPANIES_TO_PROCESS}). Stopping.")
+                    break
 
                 # Without AI evaluation, every job matching the search query is processed directly
                 match_reason = f"Relevant opening for {job['title']}"
@@ -72,6 +77,8 @@ def main():
                     True,
                     match_reason
                 )
+                
+                companies_processed += 1
 
                 print(f"Processing job match: {job['title']} at {job['company']}")
 
@@ -105,6 +112,9 @@ def main():
                 page.bring_to_front()
                 page.wait_for_timeout(1000)
 
+            if companies_processed >= config.MAX_COMPANIES_TO_PROCESS:
+                break
+                
             # Move to the next page
             start += num_cards
 
