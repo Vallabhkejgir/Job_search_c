@@ -40,12 +40,17 @@ def main():
             print("No jobs found or unable to load job search page.")
             return
 
+        TARGET_EVALUATIONS = 15
         jobs_evaluated_today = 0
 
         # 2. Interleaved Process: Extract -> Evaluate -> Search Employees -> Message
         for i in range(num_cards):
-            # Dynamically locate card element in search results list
-            card = page.locator("div._13225c48, span._983b42c3").nth(i)
+            if jobs_evaluated_today >= TARGET_EVALUATIONS:
+                print(f"Reached target of {TARGET_EVALUATIONS} new evaluations. Stopping.")
+                break
+
+            # Dynamically locate the card to avoid stale element references if the DOM shifted
+            card = page.locator("a[href*='/jobs/view/']").nth(i)
 
             # Extract job details (this will return None and skip if already processed in DB)
             job = extract_job_from_card(page, card)
