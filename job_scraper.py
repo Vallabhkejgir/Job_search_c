@@ -72,7 +72,7 @@ def extract_job_from_card(page, card):
 
         if not job_id:
             try:
-                href = card.get_attribute("href") or ""
+                href = card.get_attribute("href", timeout=1000) or ""
                 if "/jobs/view/" in href:
                     job_id = href.split("/jobs/view/")[1].split("/")[0].split("?")[0]
             except Exception:
@@ -80,12 +80,12 @@ def extract_job_from_card(page, card):
                 
         if not job_id:
             try:
-                job_id = card.get_attribute("data-job-id")
+                job_id = card.get_attribute("data-job-id", timeout=1000)
             except Exception:
                 pass
 
         # Extract basic info
-        job_id = card.get_attribute("data-job-id")
+        job_id = card.get_attribute("data-job-id", timeout=1000)
         if not job_id:
             html = page.content()
             m = re.search(r'"jobPosting":\{"jobPostingId":(\d+)', html)
