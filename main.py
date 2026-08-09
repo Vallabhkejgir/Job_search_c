@@ -56,14 +56,19 @@ def main():
                 # Dynamically locate card element in search results list
                 card = page.locator("div._13225c48, span._983b42c3").nth(i)
 
+                # Check limit BEFORE evaluating to prevent infinite skipping loops
+                if companies_processed >= config.MAX_COMPANIES_TO_PROCESS:
+                    print(f"Reached MAX_COMPANIES_TO_PROCESS limit ({config.MAX_COMPANIES_TO_PROCESS}). Stopping.")
+                    break
+                    
+                # We increment the counter here so that even if jobs are skipped (already in DB),
+                # we don't run indefinitely for 30+ minutes looking for new ones.
+                companies_processed += 1
+
                 # Extract job details (this will return None and skip if already processed in DB)
                 job = extract_job_from_card(page, card)
                 if not job:
                     continue
-                
-                if companies_processed >= config.MAX_COMPANIES_TO_PROCESS:
-                    print(f"Reached MAX_COMPANIES_TO_PROCESS limit ({config.MAX_COMPANIES_TO_PROCESS}). Stopping.")
-                    break
 
                 # Without AI evaluation, every job matching the search query is processed directly
                 match_reason = f"Relevant opening for {job['title']}"
@@ -77,8 +82,6 @@ def main():
                     True,
                     match_reason
                 )
-                
-                companies_processed += 1
 
                 print(f"Processing job match: {job['title']} at {job['company']}")
 
