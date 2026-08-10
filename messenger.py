@@ -107,13 +107,17 @@ def search_employees(page, company_url, company_name, target_titles):
             name = re.sub(r"(?i)\s*(is\s+)?open\s+to\s+work.*", "", name)
             name = re.sub(r"(?i)\s*follows this page.*", "", name)
             name = re.sub(r"(?i)\s*works here.*", "", name)
-            name = re.sub(r"(?i)\s*View .*'s profile.*", "", name)
+            # Remove explicit "View [Name]'s profile" patterns completely
+            name = re.sub(r"(?i)^view\s+(.*?)['’`]s\s+profile.*$", r"\1", name)
             # Remove any trailing "’s profile" or similar
             name = re.sub(
                 r"(?i)(?:[’\'\`]s?|\bs)?\s*\b(profile|graphic link|picture|photo|link)\b.*",
                 "",
                 name,
             )
+            # General catch-all for any leading "View " that slipped through
+            if name.lower().startswith("view "):
+                name = re.sub(r"(?i)^view\s+", "", name)
             name = name.strip()
 
             invalid_terms = {
