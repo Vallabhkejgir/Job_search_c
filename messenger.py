@@ -195,28 +195,34 @@ def send_connection_request(page, employee, job, ai_pitch, config):
         page.wait_for_timeout(random.randint(3000, 5000))
 
         # Click connect
-        connect_btn = page.locator("button[aria-label^='Invite']").first
-        if connect_btn.count() == 0:
+        connect_btn = page.locator(
+            "button:has-text('Connect'), button[aria-label*='Connect'], button[aria-label*='Invite']"
+        ).first
+        if connect_btn.count() == 0 or not connect_btn.is_visible():
             # Sometimes it's under 'More'
-            more_btn = page.locator("button[aria-label='More actions']").first
+            more_btn = page.locator(
+                "button[aria-label='More actions'], button[aria-label='More']"
+            ).first
             if more_btn.count() > 0:
-                more_btn.click()
+                more_btn.click(force=True)
                 page.wait_for_timeout(1000)
                 connect_btn = page.locator(
-                    "div.artdeco-dropdown__content button[aria-label^='Invite']"
+                    "div.artdeco-dropdown__content button:has-text('Connect'), div.artdeco-dropdown__content button[aria-label*='Connect'], div.artdeco-dropdown__content button[aria-label*='Invite']"
                 ).first
 
         if connect_btn.count() == 0:
             print(f"Could not find Connect button for {employee['name']}")
             return False
 
-        connect_btn.click()
-        page.wait_for_timeout(random.randint(1000, 2000))
+        connect_btn.click(force=True)
+        page.wait_for_timeout(random.randint(1500, 2500))
 
         # Add note
-        add_note_btn = page.locator("button[aria-label='Add a note']")
+        add_note_btn = page.locator(
+            "button:has-text('Add a note'), button[aria-label='Add a note']"
+        ).first
         if add_note_btn.count() > 0:
-            add_note_btn.click()
+            add_note_btn.click(force=True)
             page.wait_for_timeout(1000)
 
             # Type message
@@ -224,8 +230,10 @@ def send_connection_request(page, employee, job, ai_pitch, config):
             page.wait_for_timeout(random.randint(1000, 2000))
 
             # Click send
-            send_btn = page.locator("button[aria-label='Send invitation']")
-            send_btn.click()
+            send_btn = page.locator(
+                "button:has-text('Send'), button[aria-label='Send invitation']"
+            ).first
+            send_btn.click(force=True)
 
             print(f"Successfully sent connection request to {employee['name']}")
             log_user_messaged(
