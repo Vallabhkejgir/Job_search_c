@@ -67,7 +67,7 @@ async def run_agent():
     try:
         # Launch main.py as a background process using the current venv python
         python_executable = sys.executable
-        AGENT_PROCESS = subprocess.Popen(
+        AGENT_PROCESS = subprocess.Popen(  # noqa: ASYNC220
             [python_executable, "main.py"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

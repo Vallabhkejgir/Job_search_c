@@ -82,7 +82,7 @@ def extract_job_from_card(page, card):
         try:
             card.scroll_into_view_if_needed(timeout=2000)
             card.click(timeout=2000, force=True)
-        except Exception:  # noqa: BLE001, S110
+        except Exception:  # noqa: BLE001, S110  # noqa: BLE001, S110
             pass
 
         page.wait_for_timeout(random.randint(1500, 2500))
@@ -94,7 +94,7 @@ def extract_job_from_card(page, card):
             urn = card.get_attribute("data-entity-urn", timeout=1000)
             if urn and "jobPosting" in urn:
                 job_id = urn.split(":")[-1]
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
         # 2. Try URL matching
@@ -116,14 +116,14 @@ def extract_job_from_card(page, card):
                         job_id = (
                             href.split("/jobs/view/")[1].split("/")[0].split("?")[0]
                         )
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
         # 4. Try data-job-id attribute
         if not job_id:
             try:
                 job_id = card.get_attribute("data-job-id", timeout=1000)
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
         # 5. Try finding it in page content
@@ -168,7 +168,7 @@ def extract_job_from_card(page, card):
             )
             if comp_link:
                 company_url = comp_link["href"].split("?")[0]
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
         # Old/Authenticated Layout fallbacks
@@ -189,8 +189,7 @@ def extract_job_from_card(page, card):
                             and t_text not in ["About the job", "About the role"]
                             and len(t_text) > 3
                         ) and (
-                            "(Verified job)" not in t_text
-                            and "Selected" not in t_text
+                            "(Verified job)" not in t_text and "Selected" not in t_text
                         ):
                             title = t_text
                             break
@@ -199,7 +198,7 @@ def extract_job_from_card(page, card):
                     card_text = card.inner_text().strip()
                     if card_text and len(card_text.split("\n")[0]) > 3:
                         title = card_text.split("\n")[0].strip()
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
         if "Selected," in title:
@@ -220,7 +219,7 @@ def extract_job_from_card(page, card):
                         company_url = href.split("?")[0]
                         if company == "Unknown Company":
                             company = company_link.inner_text().strip()
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
         # Extract full job description
@@ -233,7 +232,7 @@ def extract_job_from_card(page, card):
                 desc_container = about_h2.locator("xpath=parent::*/parent::*").first
                 if desc_container.count() > 0:
                     description = desc_container.inner_text().strip()
-            except Exception:  # noqa: BLE001, S110
+            except Exception:  # noqa: BLE001, S110  # noqa: BLE001, S110
                 pass
 
         if not description:
