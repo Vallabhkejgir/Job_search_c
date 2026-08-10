@@ -50,15 +50,18 @@ def load_job_search_page(page, config, start=0):
 
     # First try the newer/unauthenticated layout cards
     job_cards = page.locator("div.base-search-card, div.job-search-card").all()
+    card_selector = "div.base-search-card, div.job-search-card"
 
     if not job_cards:
         job_cards = page.locator("a[href*='/jobs/view/']").all()
+        card_selector = "a[href*='/jobs/view/']"
 
     if not job_cards:
         job_cards = page.locator("div.job-card-container, div._13225c48, span._983b42c3").all()
+        card_selector = "div.job-card-container, div._13225c48, span._983b42c3"
 
     print(f"Found {len(job_cards)} job cards on the page.")
-    return len(job_cards)
+    return len(job_cards), card_selector
 
 def extract_job_from_card(page, card):
     try:

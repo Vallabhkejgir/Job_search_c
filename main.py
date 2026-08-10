@@ -42,22 +42,15 @@ def main():
 
         while start < 1000:
             # 1. Load Job Search Page
-            num_cards = load_job_search_page(page, config, start)
+            num_cards, card_selector = load_job_search_page(page, config, start)
             if num_cards == 0:
                 if start == 0:
                     print("No jobs found or unable to load job search page.")
                 else:
                     print("No more jobs found.")
                 break
-                
-            total_jobs_found_in_run += num_cards
 
-            # Determine the primary locator for this page's cards
-            card_selector = "div.base-search-card, div.job-search-card"
-            if page.locator(card_selector).count() == 0:
-                card_selector = "a[href*='/jobs/view/']"
-                if page.locator(card_selector).count() == 0:
-                    card_selector = "div.job-card-container, div._13225c48, span._983b42c3"
+            total_jobs_found_in_run += num_cards
 
             # 2. Interleaved Process: Extract -> Search Employees -> Message
             for i in range(num_cards):
