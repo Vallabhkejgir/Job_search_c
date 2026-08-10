@@ -30,7 +30,7 @@ def main():
             headless=True,
             args=["--disable-blink-features=AutomationControlled"],
         )
-        public_page = public_browser.new_page()
+        public_page = public_browser.new_page(viewport={"width": 1280, "height": 800})
 
         # Launch persistent context for authenticated employee search and sending connection requests
         auth_context = p.chromium.launch_persistent_context(

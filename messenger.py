@@ -196,7 +196,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
 
         # Click connect
         connect_btn = page.locator(
-            "button:has-text('Connect'), button[aria-label*='Connect'], button[aria-label*='Invite']"
+            "button:text-is('Connect'), button[aria-label*='Connect'], button[aria-label*='Invite']"
         ).first
         if connect_btn.count() == 0 or not connect_btn.is_visible():
             # Sometimes it's under 'More'
@@ -207,7 +207,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                 more_btn.click(force=True)
                 page.wait_for_timeout(1000)
                 connect_btn = page.locator(
-                    "div.artdeco-dropdown__content button:has-text('Connect'), div.artdeco-dropdown__content button[aria-label*='Connect'], div.artdeco-dropdown__content button[aria-label*='Invite']"
+                    "div.artdeco-dropdown__content button:text-is('Connect'), div.artdeco-dropdown__content button[aria-label*='Connect'], div.artdeco-dropdown__content button[aria-label*='Invite']"
                 ).first
 
         if connect_btn.count() == 0:
@@ -219,7 +219,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
 
         # Add note
         add_note_btn = page.locator(
-            "button:has-text('Add a note'), button[aria-label='Add a note']"
+            "button:text-is('Add a note'), button[aria-label='Add a note']"
         ).first
         if add_note_btn.count() > 0:
             add_note_btn.click(force=True)
@@ -231,7 +231,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
 
             # Click send
             send_btn = page.locator(
-                "button:has-text('Send'), button[aria-label='Send invitation']"
+                "button:text-is('Send'), button[aria-label='Send invitation']"
             ).first
             send_btn.click(force=True)
 
