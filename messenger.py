@@ -7,7 +7,7 @@ from database import is_user_messaged, log_user_messaged
 def search_employees(page, company_url, company_name, target_titles):
     """
     Search for employees at a specific company with target titles by visiting the company's People tab.
-    Sanitizes extracted employee names (removing badges like 'is open to work') and ensures returned profile URLs are absolute.
+    Sanitizes extracted employee names (removing badges like 'is open to work', normalizing multiple spaces, and stripping 'View' prefixes to prevent 'Hi View' greetings) and ensures returned profile URLs are absolute.
     """
     print(f"[Search] Searching for contacts at {company_name}...")
     employees = []
@@ -82,16 +82,13 @@ def search_employees(page, company_url, company_name, target_titles):
             name_text = link_locator.inner_text().strip()
 
             # Clean up newlines or extra text (like "is open to work" badges)
+            # Sometimes a name might be split by multiple spaces or newlines
             name = name_text.split("\n")[0].strip() if name_text else ""
+            name = " ".join(name.split())
 
             # Extract name if it starts with View ...
             if name.lower().startswith("view "):
                 name = re.sub(r"(?i)^view\s+", "", name)
-                name = re.sub(
-                    r"(?i)\s*[’\'\`]?s?\s*(graphic\s+link|profile|picture|photo|link).*",
-                    "",
-                    name,
-                ).strip()
 
             # If inner_text was empty (e.g. image link), try extracting title or alt attribute
             if not name:
@@ -102,11 +99,6 @@ def search_employees(page, company_url, company_name, target_titles):
                         name = alt.strip()
                         if name.lower().startswith("view "):
                             name = re.sub(r"(?i)^view\s+", "", name)
-                            name = re.sub(
-                                r"(?i)\s*[’\'\`]?s?\s*(graphic\s+link|profile|picture|photo|link).*",
-                                "",
-                                name,
-                            ).strip()
 
             if not name:
                 continue
@@ -115,7 +107,16 @@ def search_employees(page, company_url, company_name, target_titles):
             name = re.sub(r"(?i)\s*(is\s+)?open\s+to\s+work.*", "", name)
             name = re.sub(r"(?i)\s*follows this page.*", "", name)
             name = re.sub(r"(?i)\s*works here.*", "", name)
-            name = re.sub(r"(?i)\s*View .*'s profile.*", "", name)
+            # Remove any trailing "’s profile" or similar
+            name = re.sub(
+                r"(?i)(?:[’\'\`]s?|\bs)?\s*\b(profile|graphic link|picture|photo|link)\b.*",
+                "",
+                name,
+            )
+
+            # Additional fallback to remove isolated "view" or similar from the name if it still sneaks in
+            name = re.sub(r"(?i)^view\b\s*", "", name)
+
             name = name.strip()
 
             invalid_terms = {
@@ -158,13 +159,49 @@ def search_employees(page, company_url, company_name, target_titles):
 def send_connection_request(page, employee, job, ai_pitch, config):
     """
     Navigates to profile and sends connection request with a note.
+    Extracts and sanitizes the first name by handling titles, possessives, and trailing symbols, safely falling back to 'there' if the name resolves exclusively to 'View' or is empty, to avoid broken messages.
     """
     print(f"[Target] Contact: {employee['name']} ({employee['profile_url']})")
 
     # Extract first name
-    first_name = (
-        employee["name"].split(" ")[0] if " " in employee["name"] else employee["name"]
-    )
+    # Clean up prefixes like Dr. or Mr. to get the actual first name
+    raw_name = employee["name"]
+    # Handle multiple spaces correctly to avoid empty strings
+    name_parts = [p for p in raw_name.split() if p.strip()]
+
+    # If the first word is a title, take the second word
+    if len(name_parts) > 1 and name_parts[0].lower().replace(".", "") in [
+        "mr",
+        "ms",
+        "mrs",
+        "dr",
+        "prof",
+        "er",
+    ]:
+        first_name = name_parts[1]
+    elif len(name_parts) > 0:
+        first_name = name_parts[0]
+    else:
+        first_name = raw_name
+
+    # Strip any trailing symbols or non-alpha characters from first name just to be safe
+    # Also correctly handle trailing possessives without breaking non-ASCII characters
+    first_name = re.sub(r"(?i)[’\'\`]s?(?=[\W\d_]*$)", "", first_name)
+    first_name = re.sub(r"[\W\d_]+$", "", first_name)
+
+    # Hard-fail check: If somehow we ended up with an empty first name, fallback to full raw name or generic
+    if not first_name.strip() or first_name.lower() == "view":
+        first_name = raw_name.strip()
+        # Fallback to avoid sending "Hi View" if raw name is still "view"
+        if first_name.lower().startswith("view "):
+            first_name = re.sub(r"(?i)^view\s+", "", first_name)
+
+        first_name = first_name.split()[0] if first_name else "there"
+        first_name = re.sub(r"(?i)[’\'\`]s?(?=[\W\d_]*$)", "", first_name)
+        first_name = re.sub(r"[\W\d_]+$", "", first_name)
+
+        if first_name.lower() == "view" or not first_name.strip():
+            first_name = "there"
 
     user_intro = getattr(config, "USER_INTRODUCTION", "").strip()
     if user_intro:
