@@ -72,6 +72,11 @@ def search_employees(page, company_url, company_name, target_titles):
             if "?" in profile_url:
                 profile_url = profile_url.split("?")[0]
 
+            profile_url = profile_url.rstrip("/")
+
+            if profile_url.startswith("http://"):
+                profile_url = "https://" + profile_url[7:]
+
             if profile_url.startswith("/"):
                 profile_url = f"https://www.linkedin.com{profile_url}"
             elif not profile_url.startswith("http"):
@@ -80,14 +85,21 @@ def search_employees(page, company_url, company_name, target_titles):
             if profile_url in seen_urls:
                 continue
 
-            seen_urls.add(profile_url)
-
             # Since the layout changed, grab the name from the text inside the link
             # The name is usually the bolded text or the only text
             name_text = link_locator.inner_text().strip()
 
             # Clean up newlines or extra text (like "is open to work" badges)
             name = name_text.split("\n")[0].strip() if name_text else ""
+
+            # Extract name if it starts with View ...
+            if name.lower().startswith("view "):
+                name = re.sub(r"(?i)^view\s+", "", name)
+                name = re.sub(
+                    r"(?i)\s*[’\'\`]?s?\s*(graphic\s+link|profile|picture|photo|link).*",
+                    "",
+                    name,
+                ).strip()
 
             # If inner_text was empty (e.g. image link), try extracting title or alt attribute
             if not name:
@@ -96,6 +108,13 @@ def search_employees(page, company_url, company_name, target_titles):
                     alt = img.get_attribute("alt") or ""
                     if alt and "picture" not in alt.lower():
                         name = alt.strip()
+                        if name.lower().startswith("view "):
+                            name = re.sub(r"(?i)^view\s+", "", name)
+                            name = re.sub(
+                                r"(?i)\s*[’\'\`]?s?\s*(graphic\s+link|profile|picture|photo|link).*",
+                                "",
+                                name,
+                            ).strip()
 
             if not name:
                 continue
@@ -107,19 +126,32 @@ def search_employees(page, company_url, company_name, target_titles):
             name = re.sub(r"(?i)\s*View .*'s profile.*", "", name)
             name = name.strip()
 
-            if not name:
+            invalid_terms = {
+                "post",
+                "linkedin member",
+                "follow",
+                "connect",
+                "view",
+                "like",
+                "comment",
+                "member",
+                "graphic link",
+                "picture",
+            }
+
+            if (
+                name.lower() in invalid_terms
+                or name.lower() == company_name.lower()
+                or len(name) < 2
+                or is_user_messaged(profile_url)
+            ):
                 continue
 
-            # Don't add if it's not a real profile link or already messaged
-            if (
-                name != "LinkedIn Member"
-                and "View" not in name
-                and not is_user_messaged(profile_url)
-            ):
-                # Appending the employee directly since we extracted the real name
-                employees.append(
-                    {"name": name, "profile_url": profile_url, "company": company_name}
-                )
+            seen_urls.add(profile_url)
+
+            employees.append(
+                {"name": name, "profile_url": profile_url, "company": company_name}
+            )
 
             if len(employees) >= 10:  # Collect up to 10 valid candidates
                 break

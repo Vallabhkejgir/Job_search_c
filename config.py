@@ -16,7 +16,7 @@ PAST_24_HOURS_FILTER = False  # 2. Ensure no limit to get jobs over past 24 hour
 # Limits & Safety (crucial for LinkedIn)
 # 1. Remove limit to message number of people
 MAX_MESSAGES_PER_DAY = float("inf")
-MAX_PEOPLE_PER_COMPANY = float("inf")
+MAX_PEOPLE_PER_COMPANY = int(os.getenv("MAX_PEOPLE_PER_COMPANY", "3"))
 MAX_COMPANIES_TO_PROCESS = int(os.getenv("MAX_COMPANIES_TO_PROCESS", "10"))
 
 # Agent Mode
