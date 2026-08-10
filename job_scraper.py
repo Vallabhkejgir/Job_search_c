@@ -1,10 +1,11 @@
 import random
-import urllib.parse
 import re
+import urllib.parse
 
 from bs4 import BeautifulSoup
 
 from database import is_job_processed
+
 
 def get_job_search_url(keywords, location, past_24_hours=True, start=0):
     base_url = "https://www.linkedin.com/jobs/search/?"
@@ -12,15 +13,23 @@ def get_job_search_url(keywords, location, past_24_hours=True, start=0):
         "keywords": keywords,
         "location": location,
         "f_TPR": "r86400" if past_24_hours else "",
-        "start": start
+        "start": start,
     }
-    return base_url + urllib.parse.urlencode({k: v for k, v in params.items() if v or k == "start"})
+    return base_url + urllib.parse.urlencode(
+        {k: v for k, v in params.items() if v or k == "start"}
+    )
+
 
 def load_job_search_page(page, config, start=0):
     """
-    Navigates to the jobs page, scrolls to load all listings, and returns the total number of job links found.
+    Navigates to the jobs page, scrolls to load all listings, and returns the total number of job links found and the card selector.
     """
-    url = get_job_search_url(config.SEARCH_KEYWORDS, config.SEARCH_LOCATION, config.PAST_24_HOURS_FILTER, start)
+    url = get_job_search_url(
+        config.SEARCH_KEYWORDS,
+        config.SEARCH_LOCATION,
+        config.PAST_24_HOURS_FILTER,
+        start,
+    )
     print(f"Navigating to job search: {url}")
 
     # Use domcontentloaded or a longer timeout for the heavy LinkedIn jobs page
@@ -31,7 +40,7 @@ def load_job_search_page(page, config, start=0):
     print("Scrolling job search results to load all postings...")
     previous_count = 0
     attempts_without_new_jobs = 0
-    
+
     while attempts_without_new_jobs < 3:
         page.mouse.wheel(0, 1500)
         page.evaluate("""
@@ -41,7 +50,9 @@ def load_job_search_page(page, config, start=0):
         """)
         page.wait_for_timeout(random.randint(1500, 2500))
 
-        current_count = page.locator("div.base-search-card, div.job-card-container, a[href*='/jobs/view/']").count()
+        current_count = page.locator(
+            "div.base-search-card, div.job-card-container, a[href*='/jobs/view/']"
+        ).count()
         if current_count > previous_count:
             previous_count = current_count
             attempts_without_new_jobs = 0
@@ -57,11 +68,14 @@ def load_job_search_page(page, config, start=0):
         card_selector = "a[href*='/jobs/view/']"
 
     if not job_cards:
-        job_cards = page.locator("div.job-card-container, div._13225c48, span._983b42c3").all()
+        job_cards = page.locator(
+            "div.job-card-container, div._13225c48, span._983b42c3"
+        ).all()
         card_selector = "div.job-card-container, div._13225c48, span._983b42c3"
 
     print(f"Found {len(job_cards)} job cards on the page.")
     return len(job_cards), card_selector
+
 
 def extract_job_from_card(page, card):
     try:
@@ -70,7 +84,7 @@ def extract_job_from_card(page, card):
             card.click(timeout=2000, force=True)
         except Exception:  # noqa: BLE001, S110
             pass
-            
+
         page.wait_for_timeout(random.randint(1500, 2500))
 
         job_id = None
@@ -99,7 +113,9 @@ def extract_job_from_card(page, card):
                     if m:
                         job_id = m.group(1)
                     else:
-                        job_id = href.split("/jobs/view/")[1].split("/")[0].split("?")[0]
+                        job_id = (
+                            href.split("/jobs/view/")[1].split("/")[0].split("?")[0]
+                        )
             except Exception:
                 pass
 
@@ -131,17 +147,25 @@ def extract_job_from_card(page, card):
             html = card.inner_html(timeout=1000)
             soup = BeautifulSoup(html, "html.parser")
 
-            title_elem = soup.find(class_=lambda x: x and isinstance(x, str) and ("title" in x.lower() or "sr-only" in x.lower()))
+            title_elem = soup.find(
+                class_=lambda x: x
+                and isinstance(x, str)
+                and ("title" in x.lower() or "sr-only" in x.lower())
+            )
             if title_elem:
                 title = title_elem.get_text(strip=True)
             else:
                 title = soup.get_text(strip=True)[:50]
 
-            comp_elem = soup.find(class_=lambda x: x and isinstance(x, str) and "subtitle" in x.lower())
+            comp_elem = soup.find(
+                class_=lambda x: x and isinstance(x, str) and "subtitle" in x.lower()
+            )
             if comp_elem:
                 company = comp_elem.get_text(strip=True)
 
-            comp_link = soup.find("a", href=lambda x: x and isinstance(x, str) and "/company/" in x)
+            comp_link = soup.find(
+                "a", href=lambda x: x and isinstance(x, str) and "/company/" in x
+            )
             if comp_link:
                 company_url = comp_link["href"].split("?")[0]
         except Exception:
@@ -155,18 +179,26 @@ def extract_job_from_card(page, card):
                     title = job_title_link.inner_text().strip()
 
                 if title == "Unknown Title" or not title:
-                    possible_titles = page.locator("h1, h2.t-24, h2.jobs-details-top-card__job-title").all()
+                    possible_titles = page.locator(
+                        "h1, h2.t-24, h2.jobs-details-top-card__job-title"
+                    ).all()
                     for t_elem in possible_titles:
                         t_text = t_elem.inner_text().strip()
-                        if t_text and t_text not in ["About the job", "About the role"] and len(t_text) > 3:
-                            if "(Verified job)" not in t_text and "Selected" not in t_text:
-                                title = t_text
-                                break
+                        if (
+                            t_text
+                            and t_text not in ["About the job", "About the role"]
+                            and len(t_text) > 3
+                        ) and (
+                            "(Verified job)" not in t_text
+                            and "Selected" not in t_text
+                        ):
+                            title = t_text
+                            break
 
                 if title == "Unknown Title" or not title:
                     card_text = card.inner_text().strip()
-                    if card_text and len(card_text.split('\n')[0]) > 3:
-                        title = card_text.split('\n')[0].strip()
+                    if card_text and len(card_text.split("\n")[0]) > 3:
+                        title = card_text.split("\n")[0].strip()
         except Exception:
             pass
 
@@ -181,7 +213,7 @@ def extract_job_from_card(page, card):
 
         try:
             if company == "Unknown Company" or not company_url:
-                company_link = page.locator("a[href*=\"/company/\"]").first
+                company_link = page.locator('a[href*="/company/"]').first
                 if company_link.count() > 0:
                     href = company_link.get_attribute("href", timeout=1000)
                     if href and "/company/" in href:
@@ -193,7 +225,9 @@ def extract_job_from_card(page, card):
 
         # Extract full job description
         description = ""
-        about_h2 = page.locator("h2:has-text('About the job'), h2:has-text('About the role')").first
+        about_h2 = page.locator(
+            "h2:has-text('About the job'), h2:has-text('About the role')"
+        ).first
         if about_h2.count() > 0:
             try:
                 desc_container = about_h2.locator("xpath=parent::*/parent::*").first
@@ -203,7 +237,9 @@ def extract_job_from_card(page, card):
                 pass
 
         if not description:
-            desc_elem = page.locator("#job-details, .jobs-description, .jobs-search__job-details").first
+            desc_elem = page.locator(
+                "#job-details, .jobs-description, .jobs-search__job-details"
+            ).first
             if desc_elem.count() > 0:
                 soup = BeautifulSoup(desc_elem.inner_html(), "html.parser")
                 description = soup.get_text(separator="\n", strip=True)
@@ -218,7 +254,7 @@ def extract_job_from_card(page, card):
             "company": company,
             "company_url": company_url,
             "description": description,
-            "url": f"https://www.linkedin.com/jobs/view/{job_id}"
+            "url": f"https://www.linkedin.com/jobs/view/{job_id}",
         }
 
     except Exception as e:  # noqa: BLE001

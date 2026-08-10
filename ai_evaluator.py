@@ -5,9 +5,16 @@ from pydantic import BaseModel, Field
 
 
 class JobEvaluation(BaseModel):
-    is_match: bool = Field(description="Whether the job is a good fit for the user based on their resume and preferences.")
-    match_reason: str = Field(description="A single sentence explaining why the user is a great fit, to be used in an outreach message. If not a match, this can be empty.")
-    target_titles: list[str] = Field(description="A list of 2-3 job titles at this company that would be best to message (e.g., 'Technical Recruiter', 'Engineering Manager').")
+    is_match: bool = Field(
+        description="Whether the job is a good fit for the user based on their resume and preferences."
+    )
+    match_reason: str = Field(
+        description="A single sentence explaining why the user is a great fit, to be used in an outreach message. If not a match, this can be empty."
+    )
+    target_titles: list[str] = Field(
+        description="A list of 2-3 job titles at this company that would be best to message (e.g., 'Technical Recruiter', 'Engineering Manager')."
+    )
+
 
 def evaluate_job(job, config):
     """
@@ -15,24 +22,22 @@ def evaluate_job(job, config):
     Returns a JobEvaluation object.
     """
     print(f"Evaluating job: {job['title']} at {job['company']}")
-    
+
     # Check if we have API key
     if not config.GEMINI_API_KEY:
         print("Warning: GEMINI_API_KEY not set. Falling back to default match.")
         return JobEvaluation(
             is_match=True,
             match_reason="I have the relevant skills for this role.",
-            target_titles=["Recruiter", "Hiring Manager"]
+            target_titles=["Recruiter", "Hiring Manager"],
         )
 
     llm = ChatGoogleGenerativeAI(
-        model=config.LLM_MODEL,
-        google_api_key=config.GEMINI_API_KEY,
-        temperature=0.2
+        model=config.LLM_MODEL, google_api_key=config.GEMINI_API_KEY, temperature=0.2
     )
-    
+
     parser = JsonOutputParser(pydantic_object=JobEvaluation)
-    
+
     prompt = PromptTemplate(
         template="""You are an expert career advisor. Evaluate if the following job is a good fit for the user.
 
@@ -54,33 +59,43 @@ Based on this information, provide:
 3. target_titles: 2-3 job titles (strings) of people at {company} who would be best to reach out to for a referral for this specific role. (e.g., "Engineering Manager", "Technical Recruiter")
 
 \n{format_instructions}""",
-        input_variables=["resume", "preferences", "job_title", "company", "job_description"],
+        input_variables=[
+            "resume",
+            "preferences",
+            "job_title",
+            "company",
+            "job_description",
+        ],
         partial_variables={"format_instructions": parser.get_format_instructions()},
     )
-    
+
     chain = prompt | llm | parser
-    
+
     try:
         # Truncate job description if it's too insanely long to save tokens
-        desc = job['description'][:8000] if len(job['description']) > 8000 else job['description']
-        
-        result = chain.invoke({
-            "resume": config.USER_RESUME,
-            "preferences": config.USER_PREFERENCES,
-            "job_title": job['title'],
-            "company": job['company'],
-            "job_description": desc
-        })
-        
+        desc = (
+            job["description"][:8000]
+            if len(job["description"]) > 8000
+            else job["description"]
+        )
+
+        result = chain.invoke(
+            {
+                "resume": config.USER_RESUME,
+                "preferences": config.USER_PREFERENCES,
+                "job_title": job["title"],
+                "company": job["company"],
+                "job_description": desc,
+            }
+        )
+
         # Pydantic parsing ensures types are correct, but since we use dict from JsonOutputParser
         # we convert it to the Pydantic object
         return JobEvaluation(**result)
-        
+
     except Exception as e:  # noqa: BLE001
         print(f"Error evaluating job {job['job_id']} with AI: {e}")
         # Default fallback on error
         return JobEvaluation(
-            is_match=False, 
-            match_reason="Error during evaluation", 
-            target_titles=[]
+            is_match=False, match_reason="Error during evaluation", target_titles=[]
         )

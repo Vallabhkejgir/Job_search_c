@@ -11,24 +11,30 @@ LLM_MODEL = os.getenv("LLM_MODEL", "gemini-flash-latest")
 # Job Search Configuration
 SEARCH_KEYWORDS = os.getenv("SEARCH_KEYWORDS", "Software Engineer")
 SEARCH_LOCATION = os.getenv("SEARCH_LOCATION", "United States")
-PAST_24_HOURS_FILTER = False # 2. Ensure no limit to get jobs over past 24 hours
+PAST_24_HOURS_FILTER = False  # 2. Ensure no limit to get jobs over past 24 hours
 
 # Limits & Safety (crucial for LinkedIn)
 # 1. Remove limit to message number of people
-MAX_MESSAGES_PER_DAY = float('inf') 
-MAX_PEOPLE_PER_COMPANY = float('inf')
-MAX_COMPANIES_TO_PROCESS = int(os.getenv('MAX_COMPANIES_TO_PROCESS', '10'))
+MAX_MESSAGES_PER_DAY = float("inf")
+MAX_PEOPLE_PER_COMPANY = float("inf")
+MAX_COMPANIES_TO_PROCESS = int(os.getenv("MAX_COMPANIES_TO_PROCESS", "10"))
 
 # Agent Mode
 DRY_RUN = os.getenv("DRY_RUN", "True").lower() in ("true", "1", "t")
 
 # User Profile Data
-USER_RESUME = os.getenv("USER_RESUME", """
+USER_RESUME = os.getenv(
+    "USER_RESUME",
+    """
 I am an experienced Software Engineer with 1+ years of experience in Python, TypeScript, and React. 
 I have built scalable web applications and worked extensively with LLMs and AI integrations.
-""")
+""",
+)
 
-USER_PREFERENCES = os.getenv("USER_PREFERENCES", """
+USER_PREFERENCES = os.getenv(
+    "USER_PREFERENCES",
+    """
 Looking for remote or hybrid roles. Open to Senior or Mid-level positions. 
 I prefer companies working in AI, developer tools, or fintech.
-""")
+""",
+)
