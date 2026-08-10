@@ -118,6 +118,10 @@ def search_employees(page, company_url, company_name, target_titles):
             # General catch-all for any leading "View " that slipped through
             if name.lower().startswith("view "):
                 name = re.sub(r"(?i)^view\s+", "", name)
+
+            # Additional fallback to remove isolated "view" or similar from the name if it still sneaks in
+            name = re.sub(r"(?i)^view\b\s*", "", name)
+
             name = name.strip()
 
             invalid_terms = {
@@ -191,8 +195,17 @@ def send_connection_request(page, employee, job, ai_pitch, config):
     first_name = re.sub(r"(?i)[’\'\`]s?$", "", first_name)
 
     # Hard-fail check: If somehow we ended up with an empty first name, fallback to full raw name or generic
-    if not first_name.strip():
-        first_name = raw_name.strip() or "there"
+    if not first_name.strip() or first_name.lower() == "view":
+        first_name = raw_name.strip()
+        # Fallback to avoid sending "Hi View" if raw name is still "view"
+        if first_name.lower().startswith("view "):
+            first_name = re.sub(r"(?i)^view\s+", "", first_name)
+
+        first_name = first_name.split()[0] if first_name else "there"
+        first_name = re.sub(r"[\W\d_]+$", "", first_name)
+
+        if first_name.lower() == "view" or not first_name.strip():
+            first_name = "there"
 
     user_intro = getattr(config, "USER_INTRODUCTION", "").strip()
     if user_intro:
