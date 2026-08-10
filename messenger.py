@@ -166,6 +166,7 @@ def search_employees(page, company_url, company_name, target_titles):
 def send_connection_request(page, employee, job, ai_pitch, config):
     """
     Navigates to profile and sends connection request with a note.
+    Extracts and sanitizes the first name by handling titles, possessives, and trailing symbols to avoid empty or broken messages.
     """
     print(f"[Target] Contact: {employee['name']} ({employee['profile_url']})")
 
