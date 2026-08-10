@@ -196,18 +196,18 @@ def send_connection_request(page, employee, job, ai_pitch, config):
 
         # Click connect
         connect_btn = page.locator(
-            "button:text-is('Connect'), button[aria-label*='Connect'], button[aria-label*='Invite']"
+            "main button:has-text('Connect'), main a:has-text('Connect'), button[aria-label*='Connect'], button[aria-label*='Invite']"
         ).first
         if connect_btn.count() == 0 or not connect_btn.is_visible():
             # Sometimes it's under 'More'
             more_btn = page.locator(
-                "button[aria-label='More actions'], button[aria-label='More']"
+                "main button[aria-label='More actions'], main button[aria-label='More']"
             ).first
             if more_btn.count() > 0:
                 more_btn.click(force=True)
                 page.wait_for_timeout(1000)
                 connect_btn = page.locator(
-                    "div.artdeco-dropdown__content button:text-is('Connect'), div.artdeco-dropdown__content button[aria-label*='Connect'], div.artdeco-dropdown__content button[aria-label*='Invite']"
+                    "div[role='menu'] *:has-text('Connect'), div.artdeco-dropdown__content *:has-text('Connect'), ul *:has-text('Connect')"
                 ).first
 
         if connect_btn.count() == 0:
@@ -219,19 +219,21 @@ def send_connection_request(page, employee, job, ai_pitch, config):
 
         # Add note
         add_note_btn = page.locator(
-            "button:text-is('Add a note'), button[aria-label='Add a note']"
+            "button:has-text('Add a note'), button[aria-label='Add a note'], button:has-text('Add note')"
         ).first
         if add_note_btn.count() > 0:
             add_note_btn.click(force=True)
             page.wait_for_timeout(1000)
 
             # Type message
-            page.locator("textarea[name='message']").fill(message)
+            page.locator(
+                "textarea[name='message'], textarea#custom-message, textarea"
+            ).first.fill(message)
             page.wait_for_timeout(random.randint(1000, 2000))
 
             # Click send
             send_btn = page.locator(
-                "button:text-is('Send'), button[aria-label='Send invitation']"
+                "button:has-text('Send'), button[aria-label='Send invitation'], button[aria-label='Send now']"
             ).first
             send_btn.click(force=True)
 
