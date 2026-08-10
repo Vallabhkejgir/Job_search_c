@@ -146,9 +146,11 @@ def extract_job_from_card(page, card):
             soup = BeautifulSoup(html, "html.parser")
 
             title_elem = soup.find(
-                class_=lambda x: x
-                and isinstance(x, str)
-                and ("title" in x.lower() or "sr-only" in x.lower())
+                class_=lambda x: (
+                    x
+                    and isinstance(x, str)
+                    and ("title" in x.lower() or "sr-only" in x.lower())
+                )
             )
             if title_elem:
                 title = title_elem.get_text(strip=True)

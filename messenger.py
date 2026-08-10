@@ -247,7 +247,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
 
             # Sleep to avoid rate limits
             sleep_time = random.randint(15000, 30000)
-            print(f"Sleeping for {sleep_time/1000}s to avoid rate limits...")
+            print(f"Sleeping for {sleep_time / 1000}s to avoid rate limits...")
             page.wait_for_timeout(sleep_time)
             return True
         else:

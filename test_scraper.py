@@ -63,9 +63,11 @@ def test_lambdas():
     # This would throw if isinstance(x, str) wasn't there since some classes are lists
 
     title_elem = soup.find(
-        class_=lambda x: x
-        and isinstance(x, str)
-        and ("title" in x.lower() or "sr-only" in x.lower())
+        class_=lambda x: (
+            x
+            and isinstance(x, str)
+            and ("title" in x.lower() or "sr-only" in x.lower())
+        )
     )
     assert title_elem.get_text() == "Title"
 
