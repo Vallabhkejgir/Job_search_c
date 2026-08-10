@@ -25,15 +25,23 @@ def main():
     messages_sent_today = 0
 
     with sync_playwright() as p:
-        # Launch browser with saved session
-        context = p.chromium.launch_persistent_context(
+        # Launch unauthenticated browser for public job search (bypasses authenticated SPA redirects)
+        public_browser = p.chromium.launch(
+            headless=True,
+            args=["--disable-blink-features=AutomationControlled"],
+        )
+        public_page = public_browser.new_page(viewport={"width": 1280, "height": 800})
+
+        # Launch persistent context for authenticated employee search and sending connection requests
+        auth_context = p.chromium.launch_persistent_context(
             user_data_dir=SESSION_DIR,
             headless=True,
             args=["--disable-blink-features=AutomationControlled"],
             viewport={"width": 1280, "height": 800},
         )
-
-        page = context.pages[0] if context.pages else context.new_page()
+        auth_page = (
+            auth_context.pages[0] if auth_context.pages else auth_context.new_page()
+        )
 
         total_jobs_found_in_run = 0
         start = 0
@@ -41,8 +49,8 @@ def main():
         processed_company_names = set()
 
         while start < 1000:
-            # 1. Load Job Search Page
-            num_cards, card_selector = load_job_search_page(page, config, start)
+            # 1. Load Job Search Page using public page for full card listings
+            num_cards, card_selector = load_job_search_page(public_page, config, start)
             if num_cards == 0:
                 if start == 0:
                     print("No jobs found or unable to load job search page.")
@@ -54,11 +62,11 @@ def main():
 
             # 2. Interleaved Process: Extract -> Search Employees -> Message
             for i in range(num_cards):
-                # Dynamically locate card element in search results list
-                card = page.locator(card_selector).nth(i)
+                # Dynamically locate card element in public search results list
+                card = public_page.locator(card_selector).nth(i)
 
-                # Extract job details (this will return None and skip if already processed in DB)
-                job = extract_job_from_card(page, card)
+                # Extract job details
+                job = extract_job_from_card(public_page, card)
                 if not job:
                     continue
 
@@ -72,9 +80,13 @@ def main():
                     processed_company_names.add(company_name)
                     companies_processed += 1
 
-                # Without AI evaluation, every job matching the search query is processed directly
+                # Without AI evaluation, every job matching search query is processed
                 match_reason = f"Relevant opening for {job['title']}"
-                target_titles = ["Recruiter", "Engineering Manager", "Hiring Manager"]
+                target_titles = [
+                    "Recruiter",
+                    "Engineering Manager",
+                    "Hiring Manager",
+                ]
 
                 # Log job
                 log_job_processed(
@@ -83,24 +95,23 @@ def main():
 
                 print(f"Processing job match: {job['title']} at {job['company']}")
 
-                # Check if we can still send messages
+                # Check daily message limit
                 if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
                     print(
-                        f"Daily message limit ({config.MAX_MESSAGES_PER_DAY}) reached. Skipping messaging for {job['company']} but will continue logging jobs."
+                        f"Daily message limit ({config.MAX_MESSAGES_PER_DAY}) reached. Skipping messaging."
                     )
                     continue
 
-                # 3. Find employees using a dedicated worker tab
-                worker_page = context.new_page()
+                # 3. Find employees using the authenticated session
                 try:
                     employees = search_employees(
-                        worker_page,
+                        auth_page,
                         job.get("company_url"),
                         job["company"],
                         target_titles,
                     )
 
-                    # 4. Message employees
+                    # 4. Message employees using authenticated session
                     messaged_for_this_company = 0
                     for emp in employees:
                         if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
@@ -109,18 +120,14 @@ def main():
                             break
 
                         success = send_connection_request(
-                            worker_page, emp, job, match_reason, config
+                            auth_page, emp, job, match_reason, config
                         )
 
                         if success:
                             messages_sent_today += 1
                             messaged_for_this_company += 1
-                finally:
-                    worker_page.close()
-
-                # Return to the main tab context visually (optional, Playwright handles it internally)
-                page.bring_to_front()
-                page.wait_for_timeout(1000)
+                except Exception as e:  # noqa: BLE001
+                    print(f"Error processing outreach for {job['company']}: {e}")
 
             if companies_processed >= config.MAX_COMPANIES_TO_PROCESS:
                 break
@@ -132,7 +139,8 @@ def main():
         print(
             f"Finished run. Jobs found in run: {total_jobs_found_in_run}. Total jobs in DB: {total_jobs_in_db}. Sent {messages_sent_today} messages."
         )
-        context.close()
+        public_browser.close()
+        auth_context.close()
 
 
 if __name__ == "__main__":
