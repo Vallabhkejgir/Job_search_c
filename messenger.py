@@ -1,4 +1,5 @@
 import random
+import re
 
 from database import is_user_messaged, log_user_messaged
 
@@ -6,12 +7,15 @@ from database import is_user_messaged, log_user_messaged
 def search_employees(page, company_url, company_name, target_titles):
     """
     Search for employees at a specific company with target titles by visiting the company's People tab.
+    Sanitizes extracted employee names (removing badges like 'is open to work') and ensures returned profile URLs are absolute.
     """
     print(f"Searching for employees at {company_name}...")
     employees = []
 
     if not company_url:
-        print(f"No company URL found for {company_name}. Cannot search their People tab.")
+        print(
+            f"No company URL found for {company_name}. Cannot search their People tab."
+        )
         return employees
 
     # Ensure the company URL ends with a slash before appending "people/"
@@ -31,13 +35,17 @@ def search_employees(page, company_url, company_name, target_titles):
     # Type the target titles into the "Search employees" input box
     try:
         keywords = " OR ".join([f'"{title}"' for title in target_titles])
-        search_input = page.locator("input[placeholder*='Search employees'], input#people-search-keywords, input[aria-label*='Search employees']").first
+        search_input = page.locator(
+            "input[placeholder*='Search employees'], input#people-search-keywords, input[aria-label*='Search employees']"
+        ).first
         if search_input.count() > 0:
             search_input.fill(keywords)
             search_input.press("Enter")
             page.wait_for_timeout(random.randint(4000, 6000))
         else:
-            print("Could not find the search box on the company People tab. Proceeding with raw list.")
+            print(
+                "Could not find the search box on the company People tab. Proceeding with raw list."
+            )
     except Exception as e:  # noqa: BLE001
         print(f"Error interacting with company search box: {e}")
 
@@ -64,6 +72,11 @@ def search_employees(page, company_url, company_name, target_titles):
             if "?" in profile_url:
                 profile_url = profile_url.split("?")[0]
 
+            if profile_url.startswith("/"):
+                profile_url = f"https://www.linkedin.com{profile_url}"
+            elif not profile_url.startswith("http"):
+                profile_url = f"https://www.linkedin.com/{profile_url}"
+
             if profile_url in seen_urls:
                 continue
 
@@ -74,10 +87,7 @@ def search_employees(page, company_url, company_name, target_titles):
             name_text = link_locator.inner_text().strip()
 
             # Clean up newlines or extra text (like "is open to work" badges)
-            name = name_text.split('\n')[0].strip() if name_text else ""
-            if "open to work" in name.lower():
-                import re
-                name = re.sub(r"(?i)\s*(is\s+)?open\s+to\s+work.*", "", name).strip()
+            name = name_text.split("\n")[0].strip() if name_text else ""
 
             # If inner_text was empty (e.g. image link), try extracting title or alt attribute
             if not name:
@@ -90,32 +100,26 @@ def search_employees(page, company_url, company_name, target_titles):
             if not name:
                 continue
 
-            # Don't add if it's not a real profile link or already messaged
-            if name != "LinkedIn Member" and "View" not in name and not is_user_messaged(profile_url):
-                # On the company page, we don't strictly need to check if they still work there
-                # because the "People" tab is specifically for current employees.
-                # However, it doesn't hurt to keep a sanity check if the DOM supports it.
-                parent_container = link_locator.locator("xpath=ancestor::li").first
-                if parent_container.count() == 0:
-                    # In company people grids, the container is often a div
-                    parent_container = link_locator.locator("xpath=ancestor::div[contains(@class, 'org-people-profile-card') or contains(@class, 'entity-result__item')]").first
-
-                if parent_container.count() > 0:
-                    container_text = parent_container.inner_text()
-                    lines = [line.strip() for line in container_text.split('\n') if line.strip()]
-                    if len(lines) > 0 and lines[0]:
-                        name = lines[0]
-
             # Clean up open to work or other extra text from name
-            if "open to work" in name.lower():
-                import re
-                name = re.sub(r"(?i)\s*(is\s+)?open\s+to\s+work.*", "", name).strip()
+            name = re.sub(r"(?i)\s*(is\s+)?open\s+to\s+work.*", "", name)
+            name = re.sub(r"(?i)\s*follows this page.*", "", name)
+            name = re.sub(r"(?i)\s*works here.*", "", name)
+            name = re.sub(r"(?i)\s*View .*'s profile.*", "", name)
+            name = name.strip()
 
-            employees.append({
-                "name": name,
-                "profile_url": profile_url,
-                "company": company_name
-            })
+            if not name:
+                continue
+
+            # Don't add if it's not a real profile link or already messaged
+            if (
+                name != "LinkedIn Member"
+                and "View" not in name
+                and not is_user_messaged(profile_url)
+            ):
+                # Appending the employee directly since we extracted the real name
+                employees.append(
+                    {"name": name, "profile_url": profile_url, "company": company_name}
+                )
 
             if len(employees) >= 10:  # Collect up to 10 valid candidates
                 break
@@ -126,35 +130,43 @@ def search_employees(page, company_url, company_name, target_titles):
     print(f"Found {len(employees)} potential contacts at {company_name}.")
     return employees
 
+
 def send_connection_request(page, employee, job, ai_pitch, config):
     """
     Navigates to profile and sends connection request with a note.
     """
     print(f"Preparing to message {employee['name']} ({employee['profile_url']})")
-    
+
     # Extract first name
-    first_name = employee['name'].split(" ")[0] if " " in employee['name'] else employee['name']
-    
+    first_name = (
+        employee["name"].split(" ")[0] if " " in employee["name"] else employee["name"]
+    )
+
     message = f"Hi {first_name},\n\nI noticed the {job['title']} opening at {job['company']}. I'd be a great fit because {ai_pitch}\n\nWould you be open to a quick chat or referring me?\n\nThanks!"
-    
+
     if len(message) > 300:
         # LinkedIn connection note limit is 300 chars
         print(f"Message too long ({len(message)} chars). Truncating...")
         message = message[:297] + "..."
-        
+
     print(f"Draft Message:\n---\n{message}\n---")
-    
+
     if config.DRY_RUN:
         print(f"DRY RUN: Skipping actual send to {employee['name']}")
         # Log it anyway for testing flow
-        log_user_messaged(employee['profile_url'], employee['name'], employee['company'], job['job_id'])
+        log_user_messaged(
+            employee["profile_url"],
+            employee["name"],
+            employee["company"],
+            job["job_id"],
+        )
         return True
-        
+
     try:
         # Actually navigate and send
-        page.goto(employee['profile_url'])
+        page.goto(employee["profile_url"])
         page.wait_for_timeout(random.randint(3000, 5000))
-        
+
         # Click connect
         connect_btn = page.locator("button[aria-label^='Invite']").first
         if connect_btn.count() == 0:
@@ -163,32 +175,39 @@ def send_connection_request(page, employee, job, ai_pitch, config):
             if more_btn.count() > 0:
                 more_btn.click()
                 page.wait_for_timeout(1000)
-                connect_btn = page.locator("div.artdeco-dropdown__content button[aria-label^='Invite']").first
-                
+                connect_btn = page.locator(
+                    "div.artdeco-dropdown__content button[aria-label^='Invite']"
+                ).first
+
         if connect_btn.count() == 0:
             print(f"Could not find Connect button for {employee['name']}")
             return False
-            
+
         connect_btn.click()
         page.wait_for_timeout(random.randint(1000, 2000))
-        
+
         # Add note
         add_note_btn = page.locator("button[aria-label='Add a note']")
         if add_note_btn.count() > 0:
             add_note_btn.click()
             page.wait_for_timeout(1000)
-            
+
             # Type message
             page.locator("textarea[name='message']").fill(message)
             page.wait_for_timeout(random.randint(1000, 2000))
-            
+
             # Click send
             send_btn = page.locator("button[aria-label='Send invitation']")
             send_btn.click()
-            
+
             print(f"Successfully sent connection request to {employee['name']}")
-            log_user_messaged(employee['profile_url'], employee['name'], employee['company'], job['job_id'])
-            
+            log_user_messaged(
+                employee["profile_url"],
+                employee["name"],
+                employee["company"],
+                job["job_id"],
+            )
+
             # Sleep to avoid rate limits
             sleep_time = random.randint(15000, 30000)
             print(f"Sleeping for {sleep_time/1000}s to avoid rate limits...")
@@ -197,7 +216,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
         else:
             print("Could not find 'Add a note' button.")
             return False
-            
+
     except Exception as e:  # noqa: BLE001
         print(f"Error sending message to {employee['name']}: {e}")
         return False
