@@ -16,17 +16,22 @@ PAST_24_HOURS_FILTER = False  # 2. Ensure no limit to get jobs over past 24 hour
 # Limits & Safety (crucial for LinkedIn)
 # 1. Remove limit to message number of people
 MAX_MESSAGES_PER_DAY = float("inf")
-MAX_PEOPLE_PER_COMPANY = float("inf")
+MAX_PEOPLE_PER_COMPANY = int(os.getenv("MAX_PEOPLE_PER_COMPANY", "3"))
 MAX_COMPANIES_TO_PROCESS = int(os.getenv("MAX_COMPANIES_TO_PROCESS", "10"))
 
 # Agent Mode
 DRY_RUN = os.getenv("DRY_RUN", "True").lower() in ("true", "1", "t")
 
 # User Profile Data
+USER_INTRODUCTION = os.getenv(
+    "USER_INTRODUCTION",
+    "I am a Software Engineer with experience in building AI applications and scalable web systems.",
+)
+
 USER_RESUME = os.getenv(
     "USER_RESUME",
     """
-I am an experienced Software Engineer with 1+ years of experience in Python, TypeScript, and React. 
+I am an experienced Software Engineer with 1+ years of experience in Python, TypeScript, and React.
 I have built scalable web applications and worked extensively with LLMs and AI integrations.
 """,
 )

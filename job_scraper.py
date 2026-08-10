@@ -30,14 +30,13 @@ def load_job_search_page(page, config, start=0):
         config.PAST_24_HOURS_FILTER,
         start,
     )
-    print(f"Navigating to job search: {url}")
+    print(f"[Search] Navigating to job search: {url}")
 
     # Use domcontentloaded or a longer timeout for the heavy LinkedIn jobs page
     page.goto(url, wait_until="domcontentloaded", timeout=60000)
     page.wait_for_timeout(random.randint(3000, 5000))
 
     # Scroll the job list panel to trigger lazy-loading of all job cards
-    print("Scrolling job search results to load all postings...")
     previous_count = 0
     attempts_without_new_jobs = 0
 
@@ -134,7 +133,6 @@ def extract_job_from_card(page, card):
                 job_id = m.group(1)
 
         if not job_id:
-            print("Could not find job ID.")
             return None
 
         # Fix Title Extraction for the new UI
@@ -205,7 +203,6 @@ def extract_job_from_card(page, card):
             title = title.replace("(Verified job)", "").strip()
 
         if is_job_processed(job_id):
-            print(f"Skipping job {job_id} - already processed.")
             return None
 
         try:

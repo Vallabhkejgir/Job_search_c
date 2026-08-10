@@ -9,13 +9,10 @@ def search_employees(page, company_url, company_name, target_titles):
     Search for employees at a specific company with target titles by visiting the company's People tab.
     Sanitizes extracted employee names (removing badges like 'is open to work') and ensures returned profile URLs are absolute.
     """
-    print(f"Searching for employees at {company_name}...")
+    print(f"[Search] Searching for contacts at {company_name}...")
     employees = []
 
     if not company_url:
-        print(
-            f"No company URL found for {company_name}. Cannot search their People tab."
-        )
         return employees
 
     # Ensure the company URL ends with a slash before appending "people/"
@@ -23,13 +20,12 @@ def search_employees(page, company_url, company_name, target_titles):
         company_url += "/"
 
     people_url = f"{company_url}people/"
-    print(f"Navigating to company people page: {people_url}")
 
     try:
         page.goto(people_url, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(random.randint(3000, 5000))
     except Exception as e:  # noqa: BLE001
-        print(f"Failed to load company people page: {e}")
+        print(f"Failed to load company people page for {company_name}: {e}")
         return employees
 
     # Type the target titles into the "Search employees" input box
@@ -42,12 +38,8 @@ def search_employees(page, company_url, company_name, target_titles):
             search_input.fill(keywords)
             search_input.press("Enter")
             page.wait_for_timeout(random.randint(4000, 6000))
-        else:
-            print(
-                "Could not find the search box on the company People tab. Proceeding with raw list."
-            )
-    except Exception as e:  # noqa: BLE001
-        print(f"Error interacting with company search box: {e}")
+    except Exception:  # noqa: BLE001, S110
+        pass
 
     # Scroll slightly more aggressively to load all images/lazy loaded DOM elements
     for _ in range(3):
@@ -72,6 +64,11 @@ def search_employees(page, company_url, company_name, target_titles):
             if "?" in profile_url:
                 profile_url = profile_url.split("?")[0]
 
+            profile_url = profile_url.rstrip("/")
+
+            if profile_url.startswith("http://"):
+                profile_url = "https://" + profile_url[7:]
+
             if profile_url.startswith("/"):
                 profile_url = f"https://www.linkedin.com{profile_url}"
             elif not profile_url.startswith("http"):
@@ -80,14 +77,21 @@ def search_employees(page, company_url, company_name, target_titles):
             if profile_url in seen_urls:
                 continue
 
-            seen_urls.add(profile_url)
-
             # Since the layout changed, grab the name from the text inside the link
             # The name is usually the bolded text or the only text
             name_text = link_locator.inner_text().strip()
 
             # Clean up newlines or extra text (like "is open to work" badges)
             name = name_text.split("\n")[0].strip() if name_text else ""
+
+            # Extract name if it starts with View ...
+            if name.lower().startswith("view "):
+                name = re.sub(r"(?i)^view\s+", "", name)
+                name = re.sub(
+                    r"(?i)\s*[’\'\`]?s?\s*(graphic\s+link|profile|picture|photo|link).*",
+                    "",
+                    name,
+                ).strip()
 
             # If inner_text was empty (e.g. image link), try extracting title or alt attribute
             if not name:
@@ -96,6 +100,13 @@ def search_employees(page, company_url, company_name, target_titles):
                     alt = img.get_attribute("alt") or ""
                     if alt and "picture" not in alt.lower():
                         name = alt.strip()
+                        if name.lower().startswith("view "):
+                            name = re.sub(r"(?i)^view\s+", "", name)
+                            name = re.sub(
+                                r"(?i)\s*[’\'\`]?s?\s*(graphic\s+link|profile|picture|photo|link).*",
+                                "",
+                                name,
+                            ).strip()
 
             if not name:
                 continue
@@ -107,19 +118,32 @@ def search_employees(page, company_url, company_name, target_titles):
             name = re.sub(r"(?i)\s*View .*'s profile.*", "", name)
             name = name.strip()
 
-            if not name:
+            invalid_terms = {
+                "post",
+                "linkedin member",
+                "follow",
+                "connect",
+                "view",
+                "like",
+                "comment",
+                "member",
+                "graphic link",
+                "picture",
+            }
+
+            if (
+                name.lower() in invalid_terms
+                or name.lower() == company_name.lower()
+                or len(name) < 2
+                or is_user_messaged(profile_url)
+            ):
                 continue
 
-            # Don't add if it's not a real profile link or already messaged
-            if (
-                name != "LinkedIn Member"
-                and "View" not in name
-                and not is_user_messaged(profile_url)
-            ):
-                # Appending the employee directly since we extracted the real name
-                employees.append(
-                    {"name": name, "profile_url": profile_url, "company": company_name}
-                )
+            seen_urls.add(profile_url)
+
+            employees.append(
+                {"name": name, "profile_url": profile_url, "company": company_name}
+            )
 
             if len(employees) >= 10:  # Collect up to 10 valid candidates
                 break
@@ -135,24 +159,27 @@ def send_connection_request(page, employee, job, ai_pitch, config):
     """
     Navigates to profile and sends connection request with a note.
     """
-    print(f"Preparing to message {employee['name']} ({employee['profile_url']})")
+    print(f"[Target] Contact: {employee['name']} ({employee['profile_url']})")
 
     # Extract first name
     first_name = (
         employee["name"].split(" ")[0] if " " in employee["name"] else employee["name"]
     )
 
-    message = f"Hi {first_name},\n\nI noticed the {job['title']} opening at {job['company']}. I'd be a great fit because {ai_pitch}\n\nWould you be open to a quick chat or referring me?\n\nThanks!"
+    user_intro = getattr(config, "USER_INTRODUCTION", "").strip()
+    if user_intro:
+        message = f"Hi {first_name},\n\nI noticed the {job['title']} opening at {job['company']}.\n\n{user_intro}\n\nWould you be open to a quick chat or referring me?\n\nThanks!"
+    else:
+        message = f"Hi {first_name},\n\nI noticed the {job['title']} opening at {job['company']}. I'd be a great fit because {ai_pitch}\n\nWould you be open to a quick chat or referring me?\n\nThanks!"
 
     if len(message) > 300:
         # LinkedIn connection note limit is 300 chars
-        print(f"Message too long ({len(message)} chars). Truncating...")
         message = message[:297] + "..."
 
     print(f"Draft Message:\n---\n{message}\n---")
 
     if config.DRY_RUN:
-        print(f"DRY RUN: Skipping actual send to {employee['name']}")
+        print(f"[DRY RUN] Skipping send to {employee['name']}\n")
         # Log it anyway for testing flow
         log_user_messaged(
             employee["profile_url"],
