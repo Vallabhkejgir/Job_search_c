@@ -82,7 +82,9 @@ def search_employees(page, company_url, company_name, target_titles):
             name_text = link_locator.inner_text().strip()
 
             # Clean up newlines or extra text (like "is open to work" badges)
+            # Sometimes a name might be split by multiple spaces or newlines
             name = name_text.split("\n")[0].strip() if name_text else ""
+            name = " ".join(name.split())
 
             # Extract name if it starts with View ...
             if name.lower().startswith("view "):
