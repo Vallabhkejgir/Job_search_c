@@ -107,17 +107,12 @@ def search_employees(page, company_url, company_name, target_titles):
             name = re.sub(r"(?i)\s*(is\s+)?open\s+to\s+work.*", "", name)
             name = re.sub(r"(?i)\s*follows this page.*", "", name)
             name = re.sub(r"(?i)\s*works here.*", "", name)
-            # Remove explicit "View [Name]'s profile" patterns completely
-            name = re.sub(r"(?i)^view\s+(.*?)['’`]s\s+profile.*$", r"\1", name)
             # Remove any trailing "’s profile" or similar
             name = re.sub(
                 r"(?i)(?:[’\'\`]s?|\bs)?\s*\b(profile|graphic link|picture|photo|link)\b.*",
                 "",
                 name,
             )
-            # General catch-all for any leading "View " that slipped through
-            if name.lower().startswith("view "):
-                name = re.sub(r"(?i)^view\s+", "", name)
 
             # Additional fallback to remove isolated "view" or similar from the name if it still sneaks in
             name = re.sub(r"(?i)^view\b\s*", "", name)
@@ -202,6 +197,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
             first_name = re.sub(r"(?i)^view\s+", "", first_name)
 
         first_name = first_name.split()[0] if first_name else "there"
+        first_name = re.sub(r"(?i)[’\'\`]s?$", "", first_name)
         first_name = re.sub(r"[\W\d_]+$", "", first_name)
 
         if first_name.lower() == "view" or not first_name.strip():
