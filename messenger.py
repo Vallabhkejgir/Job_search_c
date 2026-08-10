@@ -9,13 +9,10 @@ def search_employees(page, company_url, company_name, target_titles):
     Search for employees at a specific company with target titles by visiting the company's People tab.
     Sanitizes extracted employee names (removing badges like 'is open to work') and ensures returned profile URLs are absolute.
     """
-    print(f"Searching for employees at {company_name}...")
+    print(f"[Search] Searching for contacts at {company_name}...")
     employees = []
 
     if not company_url:
-        print(
-            f"No company URL found for {company_name}. Cannot search their People tab."
-        )
         return employees
 
     # Ensure the company URL ends with a slash before appending "people/"
@@ -23,13 +20,12 @@ def search_employees(page, company_url, company_name, target_titles):
         company_url += "/"
 
     people_url = f"{company_url}people/"
-    print(f"Navigating to company people page: {people_url}")
 
     try:
         page.goto(people_url, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(random.randint(3000, 5000))
     except Exception as e:  # noqa: BLE001
-        print(f"Failed to load company people page: {e}")
+        print(f"Failed to load company people page for {company_name}: {e}")
         return employees
 
     # Type the target titles into the "Search employees" input box
@@ -42,12 +38,8 @@ def search_employees(page, company_url, company_name, target_titles):
             search_input.fill(keywords)
             search_input.press("Enter")
             page.wait_for_timeout(random.randint(4000, 6000))
-        else:
-            print(
-                "Could not find the search box on the company People tab. Proceeding with raw list."
-            )
     except Exception as e:  # noqa: BLE001
-        print(f"Error interacting with company search box: {e}")
+        pass
 
     # Scroll slightly more aggressively to load all images/lazy loaded DOM elements
     for _ in range(3):
@@ -167,24 +159,27 @@ def send_connection_request(page, employee, job, ai_pitch, config):
     """
     Navigates to profile and sends connection request with a note.
     """
-    print(f"Preparing to message {employee['name']} ({employee['profile_url']})")
+    print(f"[Target] Contact: {employee['name']} ({employee['profile_url']})")
 
     # Extract first name
     first_name = (
         employee["name"].split(" ")[0] if " " in employee["name"] else employee["name"]
     )
 
-    message = f"Hi {first_name},\n\nI noticed the {job['title']} opening at {job['company']}. I'd be a great fit because {ai_pitch}\n\nWould you be open to a quick chat or referring me?\n\nThanks!"
+    user_intro = getattr(config, "USER_INTRODUCTION", "").strip()
+    if user_intro:
+        message = f"Hi {first_name},\n\nI noticed the {job['title']} opening at {job['company']}.\n\n{user_intro}\n\nWould you be open to a quick chat or referring me?\n\nThanks!"
+    else:
+        message = f"Hi {first_name},\n\nI noticed the {job['title']} opening at {job['company']}. I'd be a great fit because {ai_pitch}\n\nWould you be open to a quick chat or referring me?\n\nThanks!"
 
     if len(message) > 300:
         # LinkedIn connection note limit is 300 chars
-        print(f"Message too long ({len(message)} chars). Truncating...")
         message = message[:297] + "..."
 
     print(f"Draft Message:\n---\n{message}\n---")
 
     if config.DRY_RUN:
-        print(f"DRY RUN: Skipping actual send to {employee['name']}")
+        print(f"[DRY RUN] Skipping send to {employee['name']}\n")
         # Log it anyway for testing flow
         log_user_messaged(
             employee["profile_url"],

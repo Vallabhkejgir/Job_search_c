@@ -23,10 +23,15 @@ MAX_COMPANIES_TO_PROCESS = int(os.getenv("MAX_COMPANIES_TO_PROCESS", "10"))
 DRY_RUN = os.getenv("DRY_RUN", "True").lower() in ("true", "1", "t")
 
 # User Profile Data
+USER_INTRODUCTION = os.getenv(
+    "USER_INTRODUCTION",
+    "I am a Software Engineer with experience in building AI applications and scalable web systems.",
+)
+
 USER_RESUME = os.getenv(
     "USER_RESUME",
     """
-I am an experienced Software Engineer with 1+ years of experience in Python, TypeScript, and React. 
+I am an experienced Software Engineer with 1+ years of experience in Python, TypeScript, and React.
 I have built scalable web applications and worked extensively with LLMs and AI integrations.
 """,
 )
