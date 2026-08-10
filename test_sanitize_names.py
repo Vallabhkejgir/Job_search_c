@@ -54,6 +54,10 @@ def test_employee_sanitize(mock_is_user_messaged):
                 inner_text="",
                 alt_text="ImageOnly is open to work",
             ),
+            MockLocator(
+                href="/in/maryjane",
+                inner_text="Mary   Jane",
+            ),
         ]
 
     mock_links_locator = MagicMock()
@@ -85,7 +89,7 @@ def test_employee_sanitize(mock_is_user_messaged):
         print(f"Name: '{emp['name']}', URL: '{emp['profile_url']}'")
 
     # Assertions
-    assert len(employees) == 6
+    assert len(employees) == 7
     assert employees[0]["name"] == "John Doe"
     assert employees[0]["profile_url"] == "https://www.linkedin.com/in/johndoe"
 
@@ -103,6 +107,10 @@ def test_employee_sanitize(mock_is_user_messaged):
 
     assert employees[5]["name"] == "ImageOnly"
     assert employees[5]["profile_url"] == "https://www.linkedin.com/in/imageonly"
+
+    assert len(employees) == 7
+    assert employees[6]["name"] == "Mary Jane"
+    assert employees[6]["profile_url"] == "https://www.linkedin.com/in/maryjane"
 
     print("All assertions passed!")
 
