@@ -1,0 +1,42 @@
+--- test_sanitize_names.py
++++ test_sanitize_names.py
+@@ -58,6 +58,14 @@
+                 href="/in/maryjane",
+                 inner_text="Mary   Jane",
+             ),
++            MockLocator(
++                href="/in/viewonly",
++                inner_text="View ViewOnly",
++            ),
++            MockLocator(
++                href="/in/viewprofile",
++                inner_text="View ViewProfile's profile",
++            ),
+         ]
+ 
+     mock_links_locator = MagicMock()
+@@ -87,7 +95,7 @@
+         print(f"Name: '{emp['name']}', URL: '{emp['profile_url']}'")
+ 
+     # Assertions
+-    assert len(employees) == 7
++    assert len(employees) == 9
+     assert employees[0]["name"] == "John Doe"
+     assert employees[0]["profile_url"] == "https://www.linkedin.com/in/johndoe"
+ 
+@@ -106,9 +114,14 @@
+     assert employees[5]["name"] == "ImageOnly"
+     assert employees[5]["profile_url"] == "https://www.linkedin.com/in/imageonly"
+ 
+-    assert len(employees) == 7
+     assert employees[6]["name"] == "Mary Jane"
+     assert employees[6]["profile_url"] == "https://www.linkedin.com/in/maryjane"
++
++    assert employees[7]["name"] == "ViewOnly"
++    assert employees[7]["profile_url"] == "https://www.linkedin.com/in/viewonly"
++
++    assert employees[8]["name"] == "ViewProfile"
++    assert employees[8]["profile_url"] == "https://www.linkedin.com/in/viewprofile"
+ 
+     print("All assertions passed!")
+ 

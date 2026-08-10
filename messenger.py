@@ -7,7 +7,7 @@ from database import is_user_messaged, log_user_messaged
 def search_employees(page, company_url, company_name, target_titles):
     """
     Search for employees at a specific company with target titles by visiting the company's People tab.
-    Sanitizes extracted employee names (removing badges like 'is open to work', normalizing multiple spaces) and ensures returned profile URLs are absolute.
+    Sanitizes extracted employee names (removing badges like 'is open to work', normalizing multiple spaces, and stripping 'View' prefixes to prevent 'Hi View' greetings) and ensures returned profile URLs are absolute.
     """
     print(f"[Search] Searching for contacts at {company_name}...")
     employees = []
