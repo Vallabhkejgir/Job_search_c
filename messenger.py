@@ -172,7 +172,8 @@ def send_connection_request(page, employee, job, ai_pitch, config):
     # Extract first name
     # Clean up prefixes like Dr. or Mr. to get the actual first name
     raw_name = employee["name"]
-    name_parts = raw_name.split()
+    # Handle multiple spaces correctly to avoid empty strings
+    name_parts = [p for p in raw_name.split() if p.strip()]
 
     # If the first word is a title, take the second word
     if len(name_parts) > 1 and name_parts[0].lower().replace(".", "") in [
@@ -181,15 +182,22 @@ def send_connection_request(page, employee, job, ai_pitch, config):
         "mrs",
         "dr",
         "prof",
+        "er",
     ]:
         first_name = name_parts[1]
-    else:
+    elif len(name_parts) > 0:
         first_name = name_parts[0]
+    else:
+        first_name = raw_name
 
     # Strip any trailing symbols or non-alpha characters from first name just to be safe
     # Also correctly handle trailing possessives without breaking non-ASCII characters
     first_name = re.sub(r"(?i)[’\'\`]s?$", "", first_name)
     first_name = re.sub(r"[\W\d_]+$", "", first_name)
+
+    # Hard-fail check: If somehow we ended up with an empty first name, fallback to full raw name or generic
+    if not first_name.strip():
+        first_name = raw_name.strip() or "there"
 
     user_intro = getattr(config, "USER_INTRODUCTION", "").strip()
     if user_intro:
