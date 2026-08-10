@@ -90,7 +90,7 @@ def search_employees(page, company_url, company_name, target_titles):
             if name.lower().startswith("view "):
                 name = re.sub(r"(?i)^view\s+", "", name)
                 name = re.sub(
-                    r"(?i)\s*[’\'\`]?s?\s*(graphic\s+link|profile|picture|photo|link).*",
+                    r"(?i)(?:[’\'\`]s?|\bs)?\s*\b(profile|graphic link|picture|photo|link)\b.*",
                     "",
                     name,
                 ).strip()
@@ -105,7 +105,7 @@ def search_employees(page, company_url, company_name, target_titles):
                         if name.lower().startswith("view "):
                             name = re.sub(r"(?i)^view\s+", "", name)
                             name = re.sub(
-                                r"(?i)\s*[’\'\`]?s?\s*(graphic\s+link|profile|picture|photo|link).*",
+                                r"(?i)(?:[’\'\`]s?|\bs)?\s*\b(profile|graphic link|picture|photo|link)\b.*",
                                 "",
                                 name,
                             ).strip()
@@ -192,8 +192,8 @@ def send_connection_request(page, employee, job, ai_pitch, config):
 
     # Strip any trailing symbols or non-alpha characters from first name just to be safe
     # Also correctly handle trailing possessives without breaking non-ASCII characters
-    first_name = re.sub(r"(?i)[’\'\`]s?$", "", first_name)
     first_name = re.sub(r"[\W\d_]+$", "", first_name)
+    first_name = re.sub(r"(?i)[’\'\`]s?$", "", first_name)
 
     # Hard-fail check: If somehow we ended up with an empty first name, fallback to full raw name or generic
     if not first_name.strip():
