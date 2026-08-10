@@ -117,7 +117,11 @@ def search_employees(page, company_url, company_name, target_titles):
             name = re.sub(r"(?i)\s*works here.*", "", name)
             name = re.sub(r"(?i)\s*View .*'s profile.*", "", name)
             # Remove any trailing "’s profile" or similar
-            name = re.sub(r"(?i)(?:[’\'\`]s?|\bs)?\s*\b(profile|graphic link|picture|photo|link)\b.*", "", name)
+            name = re.sub(
+                r"(?i)(?:[’\'\`]s?|\bs)?\s*\b(profile|graphic link|picture|photo|link)\b.*",
+                "",
+                name,
+            )
             name = name.strip()
 
             invalid_terms = {
@@ -169,7 +173,13 @@ def send_connection_request(page, employee, job, ai_pitch, config):
     name_parts = raw_name.split()
 
     # If the first word is a title, take the second word
-    if len(name_parts) > 1 and name_parts[0].lower().replace(".", "") in ["mr", "ms", "mrs", "dr", "prof"]:
+    if len(name_parts) > 1 and name_parts[0].lower().replace(".", "") in [
+        "mr",
+        "ms",
+        "mrs",
+        "dr",
+        "prof",
+    ]:
         first_name = name_parts[1]
     else:
         first_name = name_parts[0]
