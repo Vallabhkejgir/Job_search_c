@@ -186,7 +186,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
 
     # Strip any trailing symbols or non-alpha characters from first name just to be safe
     # Also correctly handle trailing possessives without breaking non-ASCII characters
-    first_name = re.sub(r"(?i)[’\'\`]s?$", "", first_name)
+    first_name = re.sub(r"(?i)[’\'\`]s?(?=[\W\d_]*$)", "", first_name)
     first_name = re.sub(r"[\W\d_]+$", "", first_name)
 
     # Hard-fail check: If somehow we ended up with an empty first name, fallback to full raw name or generic
@@ -197,7 +197,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
             first_name = re.sub(r"(?i)^view\s+", "", first_name)
 
         first_name = first_name.split()[0] if first_name else "there"
-        first_name = re.sub(r"(?i)[’\'\`]s?$", "", first_name)
+        first_name = re.sub(r"(?i)[’\'\`]s?(?=[\W\d_]*$)", "", first_name)
         first_name = re.sub(r"[\W\d_]+$", "", first_name)
 
         if first_name.lower() == "view" or not first_name.strip():
