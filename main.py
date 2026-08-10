@@ -50,9 +50,7 @@ def main():
 
         while start < 1000:
             # 1. Load Job Search Page using public page for full card listings
-            num_cards, card_selector = load_job_search_page(
-                public_page, config, start
-            )
+            num_cards, card_selector = load_job_search_page(public_page, config, start)
             if num_cards == 0:
                 if start == 0:
                     print("No jobs found or unable to load job search page.")
