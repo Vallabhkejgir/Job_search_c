@@ -38,7 +38,7 @@ def search_employees(page, company_url, company_name, target_titles):
             search_input.fill(keywords)
             search_input.press("Enter")
             page.wait_for_timeout(random.randint(4000, 6000))
-    except Exception as e:  # noqa: BLE001
+    except Exception:  # noqa: BLE001, S110
         pass
 
     # Scroll slightly more aggressively to load all images/lazy loaded DOM elements
