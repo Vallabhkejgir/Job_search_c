@@ -1,18 +1,24 @@
 import config
-from messenger import send_connection_request
-import database
 import messenger
+from messenger import send_connection_request
+
 
 def mock_log_user_messaged(url, name, company, job_id):
     pass
-    
+
+
 messenger.log_user_messaged = mock_log_user_messaged
+
 
 def test_empty_introduction():
     class MockPage:
         pass
 
-    employee = {"name": "Jane Smith", "profile_url": "https://linkedin.com/in/janesmith", "company": "Tech Inc"}
+    employee = {
+        "name": "Jane Smith",
+        "profile_url": "https://linkedin.com/in/janesmith",
+        "company": "Tech Inc",
+    }
     job = {"title": "Data Scientist", "company": "Tech Inc", "job_id": "456"}
     ai_pitch = "I know SQL."
 
@@ -21,6 +27,7 @@ def test_empty_introduction():
 
     import sys
     from io import StringIO
+
     old_stdout = sys.stdout
     sys.stdout = mystdout = StringIO()
 
@@ -28,13 +35,14 @@ def test_empty_introduction():
 
     sys.stdout = old_stdout
     output = mystdout.getvalue()
-    
+
     print("OUTPUT:")
     print(output)
-    
+
     assert "I'd be a great fit because I know SQL." in output
 
     print("Test passed!")
+
 
 if __name__ == "__main__":
     test_empty_introduction()
