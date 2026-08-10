@@ -164,10 +164,15 @@ def send_connection_request(page, employee, job, ai_pitch, config):
     print(f"[Target] Contact: {employee['name']} ({employee['profile_url']})")
 
     # Extract first name
-    # Also explicitly catch and clean cases where the text was something like "John Doe's profile"
-    # or starts with generic prefixes that bypassed earlier cleanup if any
+    # Clean up prefixes like Dr. or Mr. to get the actual first name
     raw_name = employee["name"]
-    first_name = raw_name.split(" ")[0] if " " in raw_name else raw_name
+    name_parts = raw_name.split(" ")
+
+    # If the first word is a title, take the second word
+    if len(name_parts) > 1 and name_parts[0].lower().replace(".", "") in ["mr", "ms", "mrs", "dr", "prof"]:
+        first_name = name_parts[1]
+    else:
+        first_name = name_parts[0]
 
     # Strip any trailing symbols or non-alpha characters from first name just to be safe
     # Also correctly handle trailing possessives without breaking non-ASCII characters
