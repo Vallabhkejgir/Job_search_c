@@ -166,7 +166,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
     # Extract first name
     # Clean up prefixes like Dr. or Mr. to get the actual first name
     raw_name = employee["name"]
-    name_parts = raw_name.split(" ")
+    name_parts = raw_name.split()
 
     # If the first word is a title, take the second word
     if len(name_parts) > 1 and name_parts[0].lower().replace(".", "") in ["mr", "ms", "mrs", "dr", "prof"]:
