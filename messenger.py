@@ -70,6 +70,9 @@ def search_employees(page, company_url, company_name, target_titles):
             if "?" in profile_url:
                 profile_url = profile_url.split("?")[0]
 
+            if profile_url.startswith("/in/"):
+                profile_url = f"https://www.linkedin.com{profile_url}"
+
             if profile_url in seen_urls:
                 continue
 
@@ -81,10 +84,6 @@ def search_employees(page, company_url, company_name, target_titles):
 
             # Clean up newlines or extra text (like "is open to work" badges)
             name = name_text.split("\n")[0].strip() if name_text else ""
-            if "open to work" in name.lower():
-                import re
-
-                name = re.sub(r"(?i)\s*(is\s+)?open\s+to\s+work.*", "", name).strip()
 
             # If inner_text was empty (e.g. image link), try extracting title or alt attribute
             if not name:
@@ -97,41 +96,27 @@ def search_employees(page, company_url, company_name, target_titles):
             if not name:
                 continue
 
+            # Clean up open to work or other extra text from name
+            import re
+            name = re.sub(r"(?i)\s*(is\s+)?open\s+to\s+work.*", "", name)
+            name = re.sub(r"(?i)\s*follows this page.*", "", name)
+            name = re.sub(r"(?i)\s*works here.*", "", name)
+            name = re.sub(r"(?i)\s*View .*'s profile.*", "", name)
+            name = name.strip()
+
+            if not name:
+                continue
+
             # Don't add if it's not a real profile link or already messaged
             if (
                 name != "LinkedIn Member"
                 and "View" not in name
                 and not is_user_messaged(profile_url)
             ):
-                # On the company page, we don't strictly need to check if they still work there
-                # because the "People" tab is specifically for current employees.
-                # However, it doesn't hurt to keep a sanity check if the DOM supports it.
-                parent_container = link_locator.locator("xpath=ancestor::li").first
-                if parent_container.count() == 0:
-                    # In company people grids, the container is often a div
-                    parent_container = link_locator.locator(
-                        "xpath=ancestor::div[contains(@class, 'org-people-profile-card') or contains(@class, 'entity-result__item')]"
-                    ).first
-
-                if parent_container.count() > 0:
-                    container_text = parent_container.inner_text()
-                    lines = [
-                        line.strip()
-                        for line in container_text.split("\n")
-                        if line.strip()
-                    ]
-                    if len(lines) > 0 and lines[0]:
-                        name = lines[0]
-
-            # Clean up open to work or other extra text from name
-            if "open to work" in name.lower():
-                import re
-
-                name = re.sub(r"(?i)\s*(is\s+)?open\s+to\s+work.*", "", name).strip()
-
-            employees.append(
-                {"name": name, "profile_url": profile_url, "company": company_name}
-            )
+                # Appending the employee directly since we extracted the real name
+                employees.append(
+                    {"name": name, "profile_url": profile_url, "company": company_name}
+                )
 
             if len(employees) >= 10:  # Collect up to 10 valid candidates
                 break
