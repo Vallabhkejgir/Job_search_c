@@ -1,4 +1,5 @@
 import random
+import re
 
 from database import is_user_messaged, log_user_messaged
 
@@ -70,8 +71,10 @@ def search_employees(page, company_url, company_name, target_titles):
             if "?" in profile_url:
                 profile_url = profile_url.split("?")[0]
 
-            if profile_url.startswith("/in/"):
+            if profile_url.startswith("/"):
                 profile_url = f"https://www.linkedin.com{profile_url}"
+            elif not profile_url.startswith("http"):
+                profile_url = f"https://www.linkedin.com/{profile_url}"
 
             if profile_url in seen_urls:
                 continue
@@ -97,7 +100,6 @@ def search_employees(page, company_url, company_name, target_titles):
                 continue
 
             # Clean up open to work or other extra text from name
-            import re
             name = re.sub(r"(?i)\s*(is\s+)?open\s+to\s+work.*", "", name)
             name = re.sub(r"(?i)\s*follows this page.*", "", name)
             name = re.sub(r"(?i)\s*works here.*", "", name)

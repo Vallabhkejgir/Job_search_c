@@ -22,7 +22,8 @@ def test_load_page():
         page.wait_for_timeout = lambda *args, **kwargs: None
 
         # Just to avoid the page scroll throwing errors
-        page.mouse = type("obj", (object,), {"wheel": lambda *args, **kwargs: None})
+        # page.mouse is a property, can't be set. But for this test, we don't actually call load_page,
+        # we just inline the locator logic, so we don't need to mock it.
 
         # Test the locator logic
         job_cards = page.locator("div.base-search-card, div.job-search-card").all()

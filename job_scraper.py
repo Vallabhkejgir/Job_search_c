@@ -82,7 +82,7 @@ def extract_job_from_card(page, card):
         try:
             card.scroll_into_view_if_needed(timeout=2000)
             card.click(timeout=2000, force=True)
-        except Exception:  # noqa: BLE001, S110  # noqa: BLE001, S110
+        except Exception:  # noqa: BLE001, S110
             pass
 
         page.wait_for_timeout(random.randint(1500, 2500))
@@ -154,8 +154,6 @@ def extract_job_from_card(page, card):
             )
             if title_elem:
                 title = title_elem.get_text(strip=True)
-            else:
-                title = soup.get_text(strip=True)[:50]
 
             comp_elem = soup.find(
                 class_=lambda x: x and isinstance(x, str) and "subtitle" in x.lower()
@@ -232,7 +230,7 @@ def extract_job_from_card(page, card):
                 desc_container = about_h2.locator("xpath=parent::*/parent::*").first
                 if desc_container.count() > 0:
                     description = desc_container.inner_text().strip()
-            except Exception:  # noqa: BLE001, S110  # noqa: BLE001, S110
+            except Exception:  # noqa: BLE001, S110
                 pass
 
         if not description:
