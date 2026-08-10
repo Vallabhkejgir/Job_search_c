@@ -128,17 +128,17 @@ def extract_job_from_card(page, card):
             html = card.inner_html(timeout=1000)
             soup = BeautifulSoup(html, "html.parser")
 
-            title_elem = soup.find(class_=lambda x: x and ("title" in x.lower() or "sr-only" in x.lower()))
+            title_elem = soup.find(class_=lambda x: x and isinstance(x, str) and ("title" in x.lower() or "sr-only" in x.lower()))
             if title_elem:
                 title = title_elem.get_text(strip=True)
             else:
                 title = soup.get_text(strip=True)[:50]
 
-            comp_elem = soup.find(class_=lambda x: x and "subtitle" in x.lower())
+            comp_elem = soup.find(class_=lambda x: x and isinstance(x, str) and "subtitle" in x.lower())
             if comp_elem:
                 company = comp_elem.get_text(strip=True)
 
-            comp_link = soup.find("a", href=lambda x: x and "/company/" in x)
+            comp_link = soup.find("a", href=lambda x: x and isinstance(x, str) and "/company/" in x)
             if comp_link:
                 company_url = comp_link["href"].split("?")[0]
         except Exception:

@@ -38,6 +38,7 @@ def main():
         total_jobs_found_in_run = 0
         start = 0
         companies_processed = 0
+        processed_company_names = set()
 
         while start < 1000:
             # 1. Load Job Search Page
@@ -51,28 +52,30 @@ def main():
                 
             total_jobs_found_in_run += num_cards
 
+            # Determine the primary locator for this page's cards
+            card_selector = "div.base-search-card, div.job-search-card"
+            if page.locator(card_selector).count() == 0:
+                card_selector = "a[href*='/jobs/view/']"
+                if page.locator(card_selector).count() == 0:
+                    card_selector = "div.job-card-container, div._13225c48, span._983b42c3"
+
             # 2. Interleaved Process: Extract -> Search Employees -> Message
             for i in range(num_cards):
                 # Dynamically locate card element in search results list
-                card = page.locator("div.base-search-card, div.job-search-card").nth(i)
-                if card.count() == 0:
-                    card = page.locator("a[href*='/jobs/view/']").nth(i)
-                if card.count() == 0:
-                    card = page.locator("div.job-card-container, div._13225c48, span._983b42c3").nth(i)
-
-                # Check limit before processing
-                if companies_processed >= config.MAX_COMPANIES_TO_PROCESS:
-                    print(f"Reached MAX_COMPANIES_TO_PROCESS limit ({config.MAX_COMPANIES_TO_PROCESS}). Stopping.")
-                    break
-                    
+                card = page.locator(card_selector).nth(i)
 
                 # Extract job details (this will return None and skip if already processed in DB)
                 job = extract_job_from_card(page, card)
                 if not job:
                     continue
 
-                # Increment only when a company is actually processed for employee searches/messages
-                companies_processed += 1
+                company_name = job['company']
+                if company_name not in processed_company_names:
+                    if companies_processed >= config.MAX_COMPANIES_TO_PROCESS:
+                        print(f"Reached MAX_COMPANIES_TO_PROCESS limit ({config.MAX_COMPANIES_TO_PROCESS}). Stopping.")
+                        break
+                    processed_company_names.add(company_name)
+                    companies_processed += 1
 
                 # Without AI evaluation, every job matching the search query is processed directly
                 match_reason = f"Relevant opening for {job['title']}"
