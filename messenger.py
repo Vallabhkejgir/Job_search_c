@@ -116,6 +116,8 @@ def search_employees(page, company_url, company_name, target_titles):
             name = re.sub(r"(?i)\s*follows this page.*", "", name)
             name = re.sub(r"(?i)\s*works here.*", "", name)
             name = re.sub(r"(?i)\s*View .*'s profile.*", "", name)
+            # Remove any trailing "’s profile" or similar
+            name = re.sub(r"(?i)\s*[’\'\`]?s?\s*(profile|graphic link|picture|photo|link).*", "", name)
             name = name.strip()
 
             invalid_terms = {
@@ -162,9 +164,13 @@ def send_connection_request(page, employee, job, ai_pitch, config):
     print(f"[Target] Contact: {employee['name']} ({employee['profile_url']})")
 
     # Extract first name
-    first_name = (
-        employee["name"].split(" ")[0] if " " in employee["name"] else employee["name"]
-    )
+    # Also explicitly catch and clean cases where the text was something like "John Doe's profile"
+    # or starts with generic prefixes that bypassed earlier cleanup if any
+    raw_name = employee["name"]
+    first_name = raw_name.split(" ")[0] if " " in raw_name else raw_name
+
+    # Strip any trailing symbols or non-alpha characters from first name just to be safe
+    first_name = re.sub(r"[^A-Za-z]+$", "", first_name)
 
     user_intro = getattr(config, "USER_INTRODUCTION", "").strip()
     if user_intro:
