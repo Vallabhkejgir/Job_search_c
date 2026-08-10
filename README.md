@@ -18,11 +18,17 @@ An automated agent that searches for recent job postings on LinkedIn and automat
    ```
 
 2. **Configure Environment**
-   Edit the `.env` file or `config.py` with your search preferences.
-   - Set `DRY_RUN=True` for testing.
-   - Set `MAX_COMPANIES_TO_PROCESS` to limit the number of companies processed per run (default: 10).
-   - Set `MAX_PEOPLE_PER_COMPANY` to limit how many people to message per company (default: 3).
-   - Set `USER_INTRODUCTION` to customize the introduction text used in connection request notes.
+   Copy `.env.example` to `.env` and fill in your details:
+   ```bash
+   cp .env.example .env
+   ```
+   Key environment variables:
+   - `DRY_RUN`: Set to `True` for dry run testing (drafts messages without sending).
+   - `SEARCH_KEYWORDS`: Job search query (e.g., `"AI Engineer"`).
+   - `SEARCH_LOCATION`: Location for job search (e.g., `"India"`).
+   - `MAX_COMPANIES_TO_PROCESS`: Maximum number of distinct companies to process per run (default: 10).
+   - `MAX_PEOPLE_PER_COMPANY`: Maximum number of people to message per company (default: 3).
+   - `USER_INTRODUCTION`: Custom introduction sentence used directly in connection request notes.
 
 3. **Login & Save Session**
    ```bash
