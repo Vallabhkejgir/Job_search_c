@@ -99,41 +99,44 @@ messenger.log_user_messaged = lambda *args, **kwargs: None
 def run_test_scenario(p, html_content, name):
     print(f"Running scenario: {name}")
     browser = p.chromium.launch(headless=True)
-    page = browser.new_page()
-    page.set_content(html_content)
+    try:
+        page = browser.new_page()
+        page.set_content(html_content)
 
-    page.goto = lambda url, **kwargs: None
-    page.wait_for_timeout = lambda timeout: None
+        page.goto = lambda url, **kwargs: None
+        page.wait_for_timeout = lambda timeout: None
 
-    employee = {
-        "name": "Jane Doe",
-        "profile_url": "https://linkedin.com/in/janedoe",
-        "company": "TestCorp",
-    }
-    job = {"title": "Engineer", "company": "TestCorp", "job_id": "1"}
-    config.DRY_RUN = False
+        employee = {
+            "name": "Jane Doe",
+            "profile_url": "https://linkedin.com/in/janedoe",
+            "company": "TestCorp",
+        }
+        job = {"title": "Engineer", "company": "TestCorp", "job_id": "1"}
+        config.DRY_RUN = False
 
-    # We will override page.locator.click to take screenshots right before clicking
-    # Actually, we can just patch messenger.send_connection_request locally if we wanted,
-    # or just let playwright do it. Wait, the easiest way is to wrap it.
+        # We will override page.locator.click to take screenshots right before clicking
+        # Actually, we can just patch messenger.send_connection_request locally if we wanted,
+        # or just let playwright do it. Wait, the easiest way is to wrap it.
 
-    # Take initial screenshot
-    output_dir = "/tmp/no-mistakes-evidence/01KZNW8DAQMR9NY813X2R5XQYH"
-    page.screenshot(path=os.path.join(output_dir, "01_initial_profile.png"))
+        # Take initial screenshot
+        output_dir = "/tmp/no-mistakes-evidence/01KZNW8DAQMR9NY813X2R5XQYH"
+        if os.path.exists(output_dir):
+            page.screenshot(path=os.path.join(output_dir, "01_initial_profile.png"))
 
-    success = messenger.send_connection_request(
-        page, employee, job, "I am great", config
-    )
+        success = messenger.send_connection_request(
+            page, employee, job, "I am great", config
+        )
 
-    # Take final screenshot
-    page.screenshot(path=os.path.join(output_dir, "02_final_success.png"))
+        # Take final screenshot
+        if os.path.exists(output_dir):
+            page.screenshot(path=os.path.join(output_dir, "02_final_success.png"))
 
-    if not success:
-        print(f"❌ Scenario {name} failed: function returned False")
-    else:
-        print(f"✅ Scenario {name} passed!")
-
-    browser.close()
+        if not success:
+            print(f"❌ Scenario {name} failed: function returned False")
+        else:
+            print(f"✅ Scenario {name} passed!")
+    finally:
+        browser.close()
 
 
 with sync_playwright() as p:

@@ -26,16 +26,16 @@ def manual_login():
             headless=False,  # Must be false for manual login
             args=["--disable-blink-features=AutomationControlled"],
         )
+        try:
+            page = context.pages[0] if context.pages else context.new_page()
+            page.goto("https://www.linkedin.com/login")
 
-        page = context.pages[0] if context.pages else context.new_page()
-        page.goto("https://www.linkedin.com/login")
+            input("Press ENTER here after you have logged into LinkedIn... ")
 
-        input("Press ENTER here after you have logged into LinkedIn... ")
-
-        # Give it a second to ensure any final cookies are written
-        page.wait_for_timeout(2000)
-
-        context.close()
+            # Give it a second to ensure any final cookies are written
+            page.wait_for_timeout(2000)
+        finally:
+            context.close()
         print(f"Session state saved to {SESSION_DIR}/")
 
 

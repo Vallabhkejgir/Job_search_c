@@ -22,12 +22,29 @@ def startup_event():
     init_db()
 
 
+@app.on_event("shutdown")
+def shutdown_event():
+    global AGENT_PROCESS
+    if AGENT_PROCESS is not None and AGENT_PROCESS.poll() is None:
+        AGENT_PROCESS.terminate()
+        AGENT_PROCESS.wait()
+
+
 # Ensure templates directory exists
 os.makedirs("templates", exist_ok=True)
 templates = Jinja2Templates(directory="templates")
 
 # Global state to track background process
 AGENT_PROCESS = None
+
+
+def is_agent_running():
+    global AGENT_PROCESS
+    if AGENT_PROCESS is not None and AGENT_PROCESS.poll() is None:
+        return True
+    if os.path.exists("agent.lock"):
+        return True
+    return False
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -38,7 +55,7 @@ async def read_root(request: Request):
     total_jobs = get_job_count()
     total_users = get_messaged_users_count()
 
-    is_running = AGENT_PROCESS is not None and AGENT_PROCESS.poll() is None
+    is_running = is_agent_running()
 
     return templates.TemplateResponse(
         request=request,
@@ -58,7 +75,7 @@ async def run_agent():
     global AGENT_PROCESS
 
     # Check if already running
-    if AGENT_PROCESS is not None and AGENT_PROCESS.poll() is None:
+    if is_agent_running():
         return JSONResponse(
             status_code=400,
             content={"status": "error", "message": "Agent is already running."},
@@ -84,5 +101,4 @@ async def run_agent():
 
 @app.get("/api/status")
 async def check_status():
-    is_running = AGENT_PROCESS is not None and AGENT_PROCESS.poll() is None
-    return {"is_running": is_running}
+    return {"is_running": is_agent_running()}

@@ -27,25 +27,26 @@ def test_extract():
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        page = browser.new_page()
-        page.set_content(html_content)
+        try:
+            page = browser.new_page()
+            page.set_content(html_content)
 
-        # Mock the `database.is_job_processed` to return False
-        job_scraper.is_job_processed = lambda x: False
+            # Mock the `database.is_job_processed` to return False
+            job_scraper.is_job_processed = lambda x: False
 
-        card = page.locator("div.job-search-card").first
+            card = page.locator("div.job-search-card").first
 
-        job = job_scraper.extract_job_from_card(page, card)
+            job = job_scraper.extract_job_from_card(page, card)
 
-        print("Extracted Job:", job)
+            print("Extracted Job:", job)
 
-        assert job is not None
-        assert job["job_id"] == "123456789"
-        assert job["title"] == "Software Engineer"
-        assert job["company"] == "Acme Corp"
-        assert "acme-corp" in job["company_url"]
-
-        browser.close()
+            assert job is not None
+            assert job["job_id"] == "123456789"
+            assert job["title"] == "Software Engineer"
+            assert job["company"] == "Acme Corp"
+            assert "acme-corp" in job["company_url"]
+        finally:
+            browser.close()
         print("Extract test passed.")
 
 

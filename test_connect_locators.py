@@ -49,31 +49,32 @@ messenger.log_user_messaged = lambda *args, **kwargs: None
 def run_test_scenario(p, html_content, name):
     print(f"Running scenario: {name}")
     browser = p.chromium.launch(headless=True)
-    page = browser.new_page()
-    page.on("console", lambda msg: print(f"Browser Console: {msg.text}"))
-    page.set_content(html_content)
+    try:
+        page = browser.new_page()
+        page.on("console", lambda msg: print(f"Browser Console: {msg.text}"))
+        page.set_content(html_content)
 
-    page.goto = lambda url, **kwargs: None
-    page.wait_for_timeout = lambda timeout: None
+        page.goto = lambda url, **kwargs: None
+        page.wait_for_timeout = lambda timeout: None
 
-    employee = {
-        "name": "Jane Doe",
-        "profile_url": "https://linkedin.com/in/janedoe",
-        "company": "TestCorp",
-    }
-    job = {"title": "Engineer", "company": "TestCorp", "job_id": "1"}
-    config.DRY_RUN = False
+        employee = {
+            "name": "Jane Doe",
+            "profile_url": "https://linkedin.com/in/janedoe",
+            "company": "TestCorp",
+        }
+        job = {"title": "Engineer", "company": "TestCorp", "job_id": "1"}
+        config.DRY_RUN = False
 
-    success = messenger.send_connection_request(
-        page, employee, job, "I am great", config
-    )
+        success = messenger.send_connection_request(
+            page, employee, job, "I am great", config
+        )
 
-    if not success:
-        print(f"❌ Scenario {name} failed: function returned False")
-    else:
-        print(f"✅ Scenario {name} passed!")
-
-    browser.close()
+        if not success:
+            print(f"❌ Scenario {name} failed: function returned False")
+        else:
+            print(f"✅ Scenario {name} passed!")
+    finally:
+        browser.close()
 
 
 with sync_playwright() as p:
