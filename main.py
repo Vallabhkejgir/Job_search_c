@@ -36,6 +36,7 @@ def main():
         print("Agent is already running (agent.lock exists). Exiting.")
         return
 
+    try:
         init_db()
 
         if not os.path.exists(SESSION_DIR):
