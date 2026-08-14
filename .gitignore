@@ -4,3 +4,4 @@ __pycache__/
 .env
 session/
 linkedin_agent.db
+agent.lock
