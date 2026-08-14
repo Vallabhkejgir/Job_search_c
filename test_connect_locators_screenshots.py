@@ -18,7 +18,7 @@ HTML_SCENARIO_2_MORE_CONNECT = """
         button { cursor: pointer; border: none; padding: 8px 16px; border-radius: 16px; font-weight: bold; }
         #more-btn { background: white; color: #666; border: 1px solid #666; }
         #more-btn:hover { background: #eee; }
-        
+
         .artdeco-dropdown__content {
             position: absolute; top: 120px; left: 140px; background: white; border: 1px solid #ddd; border-radius: 8px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.1); width: 150px;
@@ -26,7 +26,7 @@ HTML_SCENARIO_2_MORE_CONNECT = """
         .artdeco-dropdown__content ul { list-style: none; padding: 0; margin: 0; }
         .artdeco-dropdown__content li { padding: 10px 15px; cursor: pointer; }
         .artdeco-dropdown__content li:hover { background: #f3f2ef; }
-        
+
         #modal {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);
@@ -35,7 +35,7 @@ HTML_SCENARIO_2_MORE_CONNECT = """
         #modal textarea { width: 100%; height: 100px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; padding: 8px; box-sizing: border-box;}
         #send-btn { background: #0a66c2; color: white; float: right;}
         #add-note-btn { background: white; color: #666; border: 1px solid #666; }
-        
+
         #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 50; display: none; }
         #success { margin-top: 20px; padding: 10px; background: #d4edda; color: #155724; border-radius: 4px; text-align: center; }
     </style>

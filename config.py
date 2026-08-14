@@ -38,7 +38,7 @@ I have built scalable web applications and worked extensively with LLMs and AI i
 USER_PREFERENCES = os.getenv(
     "USER_PREFERENCES",
     """
-Looking for remote or hybrid roles. Open to Senior or Mid-level positions. 
+Looking for remote or hybrid roles. Open to Senior or Mid-level positions.
 I prefer companies working in AI, developer tools, or fintech.
 """,
 )
