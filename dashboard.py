@@ -43,7 +43,13 @@ def is_agent_running():
     if AGENT_PROCESS is not None and AGENT_PROCESS.poll() is None:
         return True
     if os.path.exists("agent.lock"):
-        return True
+        try:
+            with open("agent.lock", "r") as f:
+                pid = int(f.read().strip())
+            os.kill(pid, 0)
+            return True
+        except (ValueError, OSError):
+            return False
     return False
 
 
