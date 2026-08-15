@@ -238,7 +238,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
             "button[aria-label*='Invite']",
             "button[aria-label*='Connect']",
             "main button:has-text('Connect')",
-            "main a:has-text('Connect')"
+            "main a:has-text('Connect')",
         ]
         connect_btn = page.locator(", ".join(connect_selectors)).first
 
@@ -248,7 +248,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                 "button.pvs-profile-actions__action:has-text('More')",
                 "button[aria-label='More actions']",
                 "button[aria-label='More']",
-                "main button:has-text('More')"
+                "main button:has-text('More')",
             ]
             more_btn = page.locator(", ".join(more_selectors)).first
             if more_btn.count() > 0 and more_btn.is_visible():
@@ -260,7 +260,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                     "div.artdeco-dropdown__content button:has-text('Connect')",
                     "div.artdeco-dropdown__content span:has-text('Connect')",
                     "ul *:has-text('Connect')",
-                    "div[role='menu'] *:has-text('Connect')"
+                    "div[role='menu'] *:has-text('Connect')",
                 ]
                 connect_btn = page.locator(", ".join(dropdown_connect)).first
 
@@ -271,32 +271,36 @@ def send_connection_request(page, employee, job, ai_pitch, config):
         # Use click(force=True) to avoid interception but wrap in try-except
         try:
             connect_btn.click(force=True, timeout=5000)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Failed to click Connect button: {e}")
             return False
 
         page.wait_for_timeout(random.randint(1500, 2500))
 
         # Handle 'Other' connection reason if LinkedIn asks how we know the person
-        other_reason_btn = page.locator("button[aria-label*='Other'], button:has-text('Other')").first
+        other_reason_btn = page.locator(
+            "button[aria-label*='Other'], button:has-text('Other')"
+        ).first
         if other_reason_btn.count() > 0 and other_reason_btn.is_visible():
             try:
                 other_reason_btn.click(force=True, timeout=3000)
                 page.wait_for_timeout(1000)
                 # Click Connect again on the modal
-                modal_connect = page.locator("button[aria-label='Connect'], div[role='dialog'] button.artdeco-button--primary").first
+                modal_connect = page.locator(
+                    "button[aria-label='Connect'], div[role='dialog'] button.artdeco-button--primary"
+                ).first
                 if modal_connect.count() > 0 and modal_connect.is_visible():
                     modal_connect.click(force=True, timeout=3000)
                     page.wait_for_timeout(1500)
-            except Exception:
-                pass
+            except Exception as e:  # noqa: BLE001
+                print(f"Failed to click other reason or modal connect: {e}")
 
         # Add note
         add_note_selectors = [
             "button[aria-label='Add a note']",
             "button:has-text('Add a note')",
             "button:has-text('Add note')",
-            "button.artdeco-button--secondary:has-text('Add a note')"
+            "button.artdeco-button--secondary:has-text('Add a note')",
         ]
         add_note_btn = page.locator(", ".join(add_note_selectors)).first
 
@@ -306,7 +310,9 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                 page.wait_for_timeout(1000)
 
                 # Type message
-                msg_box = page.locator("textarea[name='message'], textarea#custom-message, div[role='dialog'] textarea").first
+                msg_box = page.locator(
+                    "textarea[name='message'], textarea#custom-message, div[role='dialog'] textarea"
+                ).first
                 msg_box.fill(message, timeout=5000)
                 page.wait_for_timeout(random.randint(1000, 2000))
 
@@ -315,9 +321,13 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                     "button[aria-label='Send invitation']",
                     "button[aria-label='Send now']",
                     "button:has-text('Send')",
-                    "button:has-text('Send without a note')" # Sometimes the button text changes
+                    "button:has-text('Send without a note')",  # Sometimes the button text changes
                 ]
-                send_btn = page.locator(", ".join(send_selectors)).filter(has_text=re.compile(r"Send|Send now", re.IGNORECASE)).first
+                send_btn = (
+                    page.locator(", ".join(send_selectors))
+                    .filter(has_text=re.compile(r"Send|Send now", re.IGNORECASE))
+                    .first
+                )
                 if send_btn.count() == 0:
                     send_btn = page.locator(", ".join(send_selectors)).first
 
@@ -336,21 +346,29 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                 print(f"Sleeping for {sleep_time / 1000}s to avoid rate limits...")
                 page.wait_for_timeout(sleep_time)
                 return True
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 print(f"Error while interacting with connection modal: {e}")
                 return False
         else:
-            print("Could not find 'Add a note' button. Checking if it's already a direct message modal...")
+            print(
+                "Could not find 'Add a note' button. Checking if it's already a direct message modal..."
+            )
             # Maybe it went straight to messaging modal if we have premium or they have open profile
-            msg_box = page.locator("textarea[name='message'], textarea#custom-message, div[role='dialog'] textarea").first
+            msg_box = page.locator(
+                "textarea[name='message'], textarea#custom-message, div[role='dialog'] textarea"
+            ).first
             if msg_box.count() > 0 and msg_box.is_visible():
                 try:
                     msg_box.fill(message, timeout=5000)
                     page.wait_for_timeout(1000)
-                    send_btn = page.locator("button[aria-label='Send'], button:has-text('Send')").first
+                    send_btn = page.locator(
+                        "button[aria-label='Send'], button:has-text('Send')"
+                    ).first
                     send_btn.click(force=True, timeout=5000)
 
-                    print(f"Successfully sent direct message/inmail to {employee['name']}")
+                    print(
+                        f"Successfully sent direct message/inmail to {employee['name']}"
+                    )
                     log_user_messaged(
                         employee["profile_url"],
                         employee["name"],
@@ -359,7 +377,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                     )
                     page.wait_for_timeout(random.randint(15000, 30000))
                     return True
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     print(f"Error sending direct message: {e}")
                     return False
 

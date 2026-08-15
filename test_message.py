@@ -88,6 +88,9 @@ class MockLocator:
             self.html = html
             self.attrs = attrs or {}
 
+    def filter(self, **kwargs):
+        return self
+
     def count(self):
         return len(self.elements)
 
