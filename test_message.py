@@ -297,8 +297,9 @@ def test_real_time_pipeline_9_people():
             return True
         return original_exists(path)
 
-    with patch("main.sync_playwright", return_value=MockPlaywright()), patch(
-        "os.path.exists", side_effect=mock_exists
+    with (
+        patch("main.sync_playwright", return_value=MockPlaywright()),
+        patch("os.path.exists", side_effect=mock_exists),
     ):
         main.main()
 
