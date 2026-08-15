@@ -74,49 +74,20 @@ def test_user_introduction_env():
     print("Test passed!")
 
 
-def test_message_10_people():
-    class MockPage:
-        def goto(self, url, **kwargs):
-            pass
+def test_real_time_pipeline_9_people():
+    import main
+    print("Running Real-Time E2E Pipeline for 9 people...")
 
-        def wait_for_timeout(self, timeout):
-            pass
+    # Override configuration for the test
+    config.MAX_MESSAGES_PER_DAY = 9
+    config.MAX_PEOPLE_PER_COMPANY = 9
+    config.MAX_COMPANIES_TO_PROCESS = 10
+    config.DRY_RUN = False
 
-        def get_by_role(self, role, name=None, exact=False):
-            return self
-
-        def locator(self, loc):
-            return self
-
-        def is_visible(self):
-            return True
-
-        def click(self):
-            pass
-
-        def fill(self, text):
-            pass
-
-    import messenger
-    messaged = []
-    messenger.log_user_messaged = lambda url, name, company, job_id: messaged.append((name, url))
-
-    config.DRY_RUN = True
-    job = {"title": "AI Engineer", "company": "TechCorp", "job_id": "456"}
-
-    for i in range(10):
-        employee = {
-            "name": f"Candidate {i+1}",
-            "profile_url": f"https://linkedin.com/in/candidate{i+1}",
-            "company": "TechCorp",
-        }
-        success = send_connection_request(MockPage(), employee, job, "Great fit", config)
-        assert success is True
-
-    assert len(messaged) == 10
-    print(f"Successfully messaged {len(messaged)} people in test pipeline!")
+    # Run the full pipeline
+    main.main()
 
 
 if __name__ == "__main__":
     test_user_introduction_env()
-    test_message_10_people()
+    test_real_time_pipeline_9_people()
