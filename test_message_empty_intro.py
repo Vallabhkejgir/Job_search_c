@@ -1,16 +1,11 @@
+from unittest.mock import patch
+
 import config
-import messenger
 from messenger import send_connection_request
 
 
-def mock_log_user_messaged(url, name, company, job_id):
-    pass
-
-
-messenger.log_user_messaged = mock_log_user_messaged
-
-
-def test_empty_introduction():
+@patch("messenger.log_user_messaged")
+def test_empty_introduction(mock_log):
     class MockPage:
         pass
 

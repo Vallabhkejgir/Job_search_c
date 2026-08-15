@@ -62,8 +62,12 @@ def main():
                     args=["--disable-blink-features=AutomationControlled"],
                 )
                 try:
-                    public_page = public_browser.new_page(viewport={"width": 1280, "height": 800})
-                    num_cards, card_selector = load_job_search_page(public_page, config, start)
+                    public_page = public_browser.new_page(
+                        viewport={"width": 1280, "height": 800}
+                    )
+                    num_cards, card_selector = load_job_search_page(
+                        public_page, config, start
+                    )
 
                     if num_cards == 0:
                         if start == 0:
@@ -87,26 +91,40 @@ def main():
                     company_name = job["company"]
                     if company_name not in processed_company_names:
                         if companies_processed >= config.MAX_COMPANIES_TO_PROCESS:
-                            print(f"Reached MAX_COMPANIES_TO_PROCESS limit ({config.MAX_COMPANIES_TO_PROCESS}). Stopping.")
+                            print(
+                                f"Reached MAX_COMPANIES_TO_PROCESS limit ({config.MAX_COMPANIES_TO_PROCESS}). Stopping."
+                            )
                             break
                         processed_company_names.add(company_name)
                         companies_processed += 1
 
                     match_reason = f"Relevant opening for {job['title']}"
-                    target_titles = ["Recruiter", "Engineering Manager", "Hiring Manager"]
+                    target_titles = [
+                        "Recruiter",
+                        "Engineering Manager",
+                        "Hiring Manager",
+                    ]
 
                     # Log job
-                    log_job_processed(job["job_id"], job["title"], job["company"], True, match_reason)
+                    log_job_processed(
+                        job["job_id"], job["title"], job["company"], True, match_reason
+                    )
                     print(f"Processing job match: {job['title']} at {job['company']}")
 
                     # Check daily message limit
                     if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
-                        print(f"Daily message limit ({config.MAX_MESSAGES_PER_DAY}) reached. Skipping messaging.")
+                        print(
+                            f"Daily message limit ({config.MAX_MESSAGES_PER_DAY}) reached. Skipping messaging."
+                        )
                         break
 
-                    messaged_for_this_company = company_message_counts.get(company_name, 0)
+                    messaged_for_this_company = company_message_counts.get(
+                        company_name, 0
+                    )
                     if messaged_for_this_company >= config.MAX_PEOPLE_PER_COMPANY:
-                        print(f"Company limit ({config.MAX_PEOPLE_PER_COMPANY}) reached for {company_name}. Skipping outreach.")
+                        print(
+                            f"Company limit ({config.MAX_PEOPLE_PER_COMPANY}) reached for {company_name}. Skipping outreach."
+                        )
                         continue
 
                     # Launch authenticated context per job
@@ -118,7 +136,11 @@ def main():
                     )
 
                     try:
-                        auth_page = auth_context.pages[0] if auth_context.pages else auth_context.new_page()
+                        auth_page = (
+                            auth_context.pages[0]
+                            if auth_context.pages
+                            else auth_context.new_page()
+                        )
 
                         employees = search_employees(
                             auth_page,
@@ -127,19 +149,28 @@ def main():
                             target_titles,
                         )
 
-                        messaged_for_this_company = company_message_counts.get(company_name, 0)
+                        messaged_for_this_company = company_message_counts.get(
+                            company_name, 0
+                        )
                         for emp in employees:
                             if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
                                 break
-                            if messaged_for_this_company >= config.MAX_PEOPLE_PER_COMPANY:
+                            if (
+                                messaged_for_this_company
+                                >= config.MAX_PEOPLE_PER_COMPANY
+                            ):
                                 break
 
-                            success = send_connection_request(auth_page, emp, job, match_reason, config)
+                            success = send_connection_request(
+                                auth_page, emp, job, match_reason, config
+                            )
 
                             if success:
                                 messages_sent_today += 1
                                 messaged_for_this_company += 1
-                                company_message_counts[company_name] = messaged_for_this_company
+                                company_message_counts[company_name] = (
+                                    messaged_for_this_company
+                                )
 
                     except Exception as e:  # noqa: BLE001
                         print(f"Error processing outreach for {job['company']}: {e}")
@@ -147,7 +178,10 @@ def main():
                         auth_context.close()
 
                 # Check global limits before loading the next page
-                if companies_processed >= config.MAX_COMPANIES_TO_PROCESS or messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
+                if (
+                    companies_processed >= config.MAX_COMPANIES_TO_PROCESS
+                    or messages_sent_today >= config.MAX_MESSAGES_PER_DAY
+                ):
                     break
 
                 # Move to the next page
