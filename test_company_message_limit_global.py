@@ -76,11 +76,6 @@ def test_global_company_limit(
     print("STDOUT from main():")
     print(output)
 
-    with open(
-        "/tmp/no-mistakes-evidence/01M02ZKJ9Q69KRXAXNPDNGKAP6/run_output.txt", "w"
-    ) as f:
-        f.write(output)
-
     assert mock_send.call_count == 2
     called_names = [call.args[1]["name"] for call in mock_send.call_args_list]
     assert called_names == ["Alice", "Bob"]

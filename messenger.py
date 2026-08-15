@@ -306,7 +306,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                 page.wait_for_timeout(1000)
 
                 # Type message
-                msg_box = page.locator("textarea[name='message'], textarea#custom-message, textarea").first
+                msg_box = page.locator("textarea[name='message'], textarea#custom-message, div[role='dialog'] textarea").first
                 msg_box.fill(message, timeout=5000)
                 page.wait_for_timeout(random.randint(1000, 2000))
 
@@ -342,7 +342,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
         else:
             print("Could not find 'Add a note' button. Checking if it's already a direct message modal...")
             # Maybe it went straight to messaging modal if we have premium or they have open profile
-            msg_box = page.locator("textarea[name='message'], textarea#custom-message, textarea").first
+            msg_box = page.locator("textarea[name='message'], textarea#custom-message, div[role='dialog'] textarea").first
             if msg_box.count() > 0 and msg_box.is_visible():
                 try:
                     msg_box.fill(message, timeout=5000)
@@ -364,3 +364,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                     return False
 
             return False
+
+    except Exception as e:  # noqa: BLE001
+        print(f"Error sending message to {employee['name']}: {e}")
+        return False
