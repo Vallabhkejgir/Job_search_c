@@ -234,21 +234,21 @@ def send_connection_request(page, employee, job, ai_pitch, config):
         # Click connect
         # Need to handle different variants of the Connect button
         connect_selectors = [
-            "button.pvs-profile-actions__action:has-text('Connect')",
-            "button[aria-label*='Invite']",
-            "button[aria-label*='Connect']",
-            "main button:has-text('Connect')",
-            "main a:has-text('Connect')",
+            "button.pvs-profile-actions__action:has-text('Connect'):visible",
+            "button[aria-label*='Invite']:visible",
+            "button[aria-label*='Connect']:visible",
+            "main button:has-text('Connect'):visible",
+            "main a:has-text('Connect'):visible",
         ]
         connect_btn = page.locator(", ".join(connect_selectors)).first
 
         if connect_btn.count() == 0 or not connect_btn.is_visible():
             # Sometimes it's under 'More'
             more_selectors = [
-                "button.pvs-profile-actions__action:has-text('More')",
-                "button[aria-label='More actions']",
-                "button[aria-label='More']",
-                "main button:has-text('More')",
+                "button.pvs-profile-actions__action:has-text('More'):visible",
+                "button[aria-label='More actions']:visible",
+                "button[aria-label='More']:visible",
+                "main button:has-text('More'):visible",
             ]
             more_btn = page.locator(", ".join(more_selectors)).first
             if more_btn.count() > 0 and more_btn.is_visible():
@@ -257,10 +257,10 @@ def send_connection_request(page, employee, job, ai_pitch, config):
 
                 # After clicking More, look for Connect in the dropdown
                 dropdown_connect = [
-                    "div.artdeco-dropdown__content button:has-text('Connect')",
-                    "div.artdeco-dropdown__content span:has-text('Connect')",
-                    "ul *:has-text('Connect')",
-                    "div[role='menu'] *:has-text('Connect')",
+                    "div.artdeco-dropdown__content button:has-text('Connect'):visible",
+                    "div.artdeco-dropdown__content span:has-text('Connect'):visible",
+                    "ul *:has-text('Connect'):visible",
+                    "div[role='menu'] *:has-text('Connect'):visible",
                 ]
                 connect_btn = page.locator(", ".join(dropdown_connect)).first
 
@@ -279,7 +279,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
 
         # Handle 'Other' connection reason if LinkedIn asks how we know the person
         other_reason_btn = page.locator(
-            "button[aria-label*='Other'], button:has-text('Other')"
+            "button[aria-label*='Other']:visible, button:has-text('Other'):visible"
         ).first
         if other_reason_btn.count() > 0 and other_reason_btn.is_visible():
             try:
@@ -287,7 +287,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                 page.wait_for_timeout(1000)
                 # Click Connect again on the modal
                 modal_connect = page.locator(
-                    "button[aria-label='Connect'], div[role='dialog'] button.artdeco-button--primary"
+                    "button[aria-label='Connect']:visible, div[role='dialog'] button.artdeco-button--primary:visible"
                 ).first
                 if modal_connect.count() > 0 and modal_connect.is_visible():
                     modal_connect.click(force=True, timeout=3000)
@@ -297,10 +297,10 @@ def send_connection_request(page, employee, job, ai_pitch, config):
 
         # Add note
         add_note_selectors = [
-            "button[aria-label='Add a note']",
-            "button:has-text('Add a note')",
-            "button:has-text('Add note')",
-            "button.artdeco-button--secondary:has-text('Add a note')",
+            "button[aria-label='Add a note']:visible",
+            "button:has-text('Add a note'):visible",
+            "button:has-text('Add note'):visible",
+            "button.artdeco-button--secondary:has-text('Add a note'):visible",
         ]
         add_note_btn = page.locator(", ".join(add_note_selectors)).first
 
@@ -311,17 +311,17 @@ def send_connection_request(page, employee, job, ai_pitch, config):
 
                 # Type message
                 msg_box = page.locator(
-                    "textarea[name='message'], textarea#custom-message, div[role='dialog'] textarea"
+                    "textarea[name='message']:visible, textarea#custom-message:visible, div[role='dialog'] textarea:visible"
                 ).first
                 msg_box.fill(message, timeout=5000)
                 page.wait_for_timeout(random.randint(1000, 2000))
 
                 # Click send
                 send_selectors = [
-                    "button[aria-label='Send invitation']",
-                    "button[aria-label='Send now']",
-                    "button:has-text('Send')",
-                    "button:has-text('Send without a note')",  # Sometimes the button text changes
+                    "button[aria-label='Send invitation']:visible",
+                    "button[aria-label='Send now']:visible",
+                    "button:has-text('Send'):visible",
+                    "button:has-text('Send without a note'):visible",  # Sometimes the button text changes
                 ]
                 send_btn = (
                     page.locator(", ".join(send_selectors))
@@ -354,7 +354,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                 "Could not find 'Add a note' button. Checking if it's already a direct message modal..."
             )
             # Debug: what modal is currently open?
-            modal = page.locator("div[role='dialog']").first
+            modal = page.locator("div[role='dialog']:visible").first
             if modal.count() > 0 and modal.is_visible():
                 print(f"DEBUG: Visible modal text: {modal.inner_text()[:300]}")
             else:
@@ -362,14 +362,14 @@ def send_connection_request(page, employee, job, ai_pitch, config):
 
             # Maybe it went straight to messaging modal if we have premium or they have open profile
             msg_box = page.locator(
-                "textarea[name='message'], textarea#custom-message, div[role='dialog'] textarea"
+                "textarea[name='message']:visible, textarea#custom-message:visible, div[role='dialog'] textarea:visible"
             ).first
             if msg_box.count() > 0 and msg_box.is_visible():
                 try:
                     msg_box.fill(message, timeout=5000)
                     page.wait_for_timeout(1000)
                     send_btn = page.locator(
-                        "button[aria-label='Send'], button:has-text('Send')"
+                        "button[aria-label='Send']:visible, button:has-text('Send'):visible"
                     ).first
                     send_btn.click(force=True, timeout=5000)
 
