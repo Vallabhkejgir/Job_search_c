@@ -234,11 +234,12 @@ def send_connection_request(page, employee, job, ai_pitch, config):
         # Click connect
         # Need to handle different variants of the Connect button
         connect_selectors = [
-            "button.pvs-profile-actions__action:has-text('Connect'):visible",
-            "button[aria-label*='Invite']:visible",
-            "button[aria-label*='Connect']:visible",
-            "main button:has-text('Connect'):visible",
-            "main a:has-text('Connect'):visible",
+            "button.pvs-profile-actions__action:has-text('Connect'):not([disabled]):visible",
+            "button[aria-label*='Invite']:not([disabled]):visible",
+            "button[aria-label*='Connect']:not([disabled]):visible",
+            "main button:has-text('Connect'):not([disabled]):visible",
+            "main a:has-text('Connect'):not([disabled]):visible",
+            "button:has-text('Connect'):not([disabled]):visible"
         ]
         connect_btn = page.locator(", ".join(connect_selectors)).first
 
@@ -283,7 +284,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
 
         # Handle 'Other' connection reason if LinkedIn asks how we know the person
         other_reason_btn = page.locator(
-            "button[aria-label*='Other']:visible, button:has-text('Other'):visible"
+            "button[aria-label*='Other']:not([disabled]):visible, button:has-text('Other'):not([disabled]):visible"
         ).first
         if other_reason_btn.count() > 0 and other_reason_btn.is_visible():
             try:
@@ -309,10 +310,10 @@ def send_connection_request(page, employee, job, ai_pitch, config):
 
         # Add note
         add_note_selectors = [
-            "button[aria-label='Add a note']:visible",
-            "button:has-text('Add a note'):visible",
-            "button:has-text('Add note'):visible",
-            "button.artdeco-button--secondary:has-text('Add a note'):visible",
+            "button[aria-label='Add a note']:not([disabled]):visible",
+            "button:has-text('Add a note'):not([disabled]):visible",
+            "button:has-text('Add note'):not([disabled]):visible",
+            "button.artdeco-button--secondary:has-text('Add a note'):not([disabled]):visible",
         ]
         add_note_btn = page.locator(", ".join(add_note_selectors)).first
 
