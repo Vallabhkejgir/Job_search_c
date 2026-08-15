@@ -5,3 +5,4 @@ __pycache__/
 session/
 linkedin_agent.db
 agent.lock
+jobs.db
