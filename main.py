@@ -44,6 +44,7 @@ def main():
             return
 
         messages_sent_today = 0
+        company_message_counts = {}
 
         with sync_playwright() as p:
             total_jobs_found_in_run = 0
@@ -121,7 +122,7 @@ def main():
                             target_titles,
                         )
 
-                        messaged_for_this_company = 0
+                        messaged_for_this_company = company_message_counts.get(company_name, 0)
                         for emp in employees:
                             if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
                                 break
@@ -133,6 +134,7 @@ def main():
                             if success:
                                 messages_sent_today += 1
                                 messaged_for_this_company += 1
+                                company_message_counts[company_name] = messaged_for_this_company
 
                     except Exception as e:  # noqa: BLE001
                         print(f"Error processing outreach for {job['company']}: {e}")
