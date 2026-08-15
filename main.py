@@ -104,6 +104,11 @@ def main():
                         print(f"Daily message limit ({config.MAX_MESSAGES_PER_DAY}) reached. Skipping messaging.")
                         break
 
+                    messaged_for_this_company = company_message_counts.get(company_name, 0)
+                    if messaged_for_this_company >= config.MAX_PEOPLE_PER_COMPANY:
+                        print(f"Company limit ({config.MAX_PEOPLE_PER_COMPANY}) reached for {company_name}. Skipping outreach.")
+                        continue
+
                     # Launch authenticated context per job
                     auth_context = p.chromium.launch_persistent_context(
                         user_data_dir=SESSION_DIR,
