@@ -54,7 +54,7 @@ JOB DESCRIPTION:
 
 Based on this information, provide:
 1. is_match: True if the job aligns with the user's resume and preferences, False otherwise.
-2. match_reason: If it's a match, write a single punchy sentence (max 150 characters) explaining why they are a great fit. This will be used in a LinkedIn connection request. 
+2. match_reason: If it's a match, write a single punchy sentence (max 150 characters) explaining why they are a great fit. This will be used in a LinkedIn connection request.
    Format it so it can be appended to "I'd be a great fit because ". For example: "my 5 years of Python experience perfectly aligns with your backend stack."
 3. target_titles: 2-3 job titles (strings) of people at {company} who would be best to reach out to for a referral for this specific role. (e.g., "Engineering Manager", "Technical Recruiter")
 
