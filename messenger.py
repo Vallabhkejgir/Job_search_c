@@ -270,7 +270,11 @@ def send_connection_request(page, employee, job, ai_pitch, config):
 
         # Use click(force=True) to avoid interception but wrap in try-except
         try:
-            connect_btn.click(force=True, timeout=5000)
+            try:
+                connect_btn.evaluate("node => node.click()")
+            except Exception as e:
+                print(f"Evaluate Connect error: {e}")
+                connect_btn.click(force=True, timeout=5000)
         except Exception as e:  # noqa: BLE001
             print(f"Failed to click Connect button: {e}")
             return False
@@ -283,14 +287,22 @@ def send_connection_request(page, employee, job, ai_pitch, config):
         ).first
         if other_reason_btn.count() > 0 and other_reason_btn.is_visible():
             try:
-                other_reason_btn.click(force=True, timeout=3000)
+                try:
+                    other_reason_btn.evaluate("node => node.click()")
+                except Exception as e:
+                    print(f"Evaluate Other reason error: {e}")
+                    other_reason_btn.click(force=True, timeout=3000)
                 page.wait_for_timeout(1000)
                 # Click Connect again on the modal
                 modal_connect = page.locator(
                     "button[aria-label='Connect']:visible, div[role='dialog'] button.artdeco-button--primary:visible"
                 ).first
                 if modal_connect.count() > 0 and modal_connect.is_visible():
-                    modal_connect.click(force=True, timeout=3000)
+                    try:
+                        modal_connect.evaluate("node => node.click()")
+                    except Exception as e:
+                        print(f"Evaluate modal Connect error: {e}")
+                        modal_connect.click(force=True, timeout=3000)
                     page.wait_for_timeout(1500)
             except Exception as e:  # noqa: BLE001
                 print(f"Failed to click other reason or modal connect: {e}")
@@ -306,7 +318,11 @@ def send_connection_request(page, employee, job, ai_pitch, config):
 
         if add_note_btn.count() > 0 and add_note_btn.is_visible():
             try:
-                add_note_btn.click(force=True, timeout=5000)
+                try:
+                    add_note_btn.evaluate("node => node.click()")
+                except Exception as e:
+                    print(f"Evaluate Add note error: {e}")
+                    add_note_btn.click(force=True, timeout=5000)
                 page.wait_for_timeout(1000)
 
                 # Type message
@@ -331,7 +347,11 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                 if send_btn.count() == 0:
                     send_btn = page.locator(", ".join(send_selectors)).first
 
-                send_btn.click(force=True, timeout=5000)
+                try:
+                    send_btn.evaluate("node => node.click()")
+                except Exception as e:
+                    print(f"Evaluate Send error: {e}")
+                    send_btn.click(force=True, timeout=5000)
 
                 print(f"Successfully sent connection request to {employee['name']}")
                 log_user_messaged(
@@ -371,7 +391,11 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                     send_btn = page.locator(
                         "button[aria-label='Send']:visible, button:has-text('Send'):visible"
                     ).first
-                    send_btn.click(force=True, timeout=5000)
+                    try:
+                        send_btn.evaluate("node => node.click()")
+                    except Exception as e:
+                        print(f"Evaluate Send error: {e}")
+                        send_btn.click(force=True, timeout=5000)
 
                     print(
                         f"Successfully sent direct message/inmail to {employee['name']}"
