@@ -231,6 +231,15 @@ def send_connection_request(page, employee, job, ai_pitch, config):
         page.goto(employee["profile_url"])
         page.wait_for_timeout(random.randint(3000, 5000))
 
+        # Close any open message overlay bubbles that might obscure the buttons
+        try:
+            close_buttons = page.locator("button.msg-overlay-bubble-header__control--close-btn:visible").all()
+            for btn in close_buttons:
+                btn.evaluate("node => node.click()")
+            page.wait_for_timeout(1000)
+        except Exception as e:
+            pass
+
         # Click connect
         # Need to handle different variants of the Connect button
         connect_selectors = [
@@ -309,7 +318,12 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                 print(f"Failed to click other reason or modal connect: {e}")
 
         # Add note
+        # If there are open messaging overlays, we should probably try to close them or ignore them, but for now we focus on the modal
+        # Add note
         add_note_selectors = [
+            "div[role='dialog'] button[aria-label='Add a note']:not([disabled]):visible",
+            "div[role='dialog'] button:has-text('Add a note'):not([disabled]):visible",
+            "div[role='dialog'] button:has-text('Add note'):not([disabled]):visible",
             "button[aria-label='Add a note']:not([disabled]):visible",
             "button:has-text('Add a note'):not([disabled]):visible",
             "button:has-text('Add note'):not([disabled]):visible",
