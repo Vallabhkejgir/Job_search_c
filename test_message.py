@@ -78,6 +78,7 @@ def test_user_introduction_env():
 import os
 from unittest.mock import patch
 
+
 class MockLocator:
     def __init__(self, elements=None, text="", html="", attrs=None):
         if elements is not None:
@@ -224,12 +225,12 @@ class MockPlaywright:
 
 
 def test_real_time_pipeline_9_people():
-    import main
-    import messenger
     import importlib
 
     # Reload database to undo the mock
     import database
+    import main
+    import messenger
     importlib.reload(database)
     importlib.reload(messenger)
 

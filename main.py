@@ -134,7 +134,7 @@ def main():
                                 messages_sent_today += 1
                                 messaged_for_this_company += 1
 
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         print(f"Error processing outreach for {job['company']}: {e}")
                     finally:
                         auth_context.close()
@@ -154,7 +154,7 @@ def main():
         if os.path.exists(lock_file):
             try:
                 os.remove(lock_file)
-            except Exception:
+            except OSError:
                 pass
 
 

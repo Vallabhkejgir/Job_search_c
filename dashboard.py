@@ -24,7 +24,6 @@ def startup_event():
 
 @app.on_event("shutdown")
 def shutdown_event():
-    global AGENT_PROCESS
     if AGENT_PROCESS is not None and AGENT_PROCESS.poll() is None:
         AGENT_PROCESS.terminate()
         AGENT_PROCESS.wait()
@@ -39,7 +38,6 @@ AGENT_PROCESS = None
 
 
 def is_agent_running():
-    global AGENT_PROCESS
     if AGENT_PROCESS is not None and AGENT_PROCESS.poll() is None:
         return True
     if os.path.exists("agent.lock"):
