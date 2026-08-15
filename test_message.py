@@ -249,7 +249,6 @@ def test_real_time_pipeline_9_people():
     original_exists = os.path.exists
     def mock_exists(path):
         if path == main.SESSION_DIR: return True
-        if path == "agent.lock": return False
         return original_exists(path)
 
     with patch('main.sync_playwright', return_value=MockPlaywright()), \
