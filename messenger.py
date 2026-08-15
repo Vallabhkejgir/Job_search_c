@@ -353,6 +353,13 @@ def send_connection_request(page, employee, job, ai_pitch, config):
             print(
                 "Could not find 'Add a note' button. Checking if it's already a direct message modal..."
             )
+            # Debug: what modal is currently open?
+            modal = page.locator("div[role='dialog']").first
+            if modal.count() > 0 and modal.is_visible():
+                print(f"DEBUG: Visible modal text: {modal.inner_text()[:300]}")
+            else:
+                print("DEBUG: No dialog is visible on the page.")
+
             # Maybe it went straight to messaging modal if we have premium or they have open profile
             msg_box = page.locator(
                 "textarea[name='message'], textarea#custom-message, div[role='dialog'] textarea"
