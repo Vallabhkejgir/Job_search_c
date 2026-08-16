@@ -303,6 +303,19 @@ def test_company_matching_validation():
     assert send_connection_request(MockPage(), emp_comp, job_missing, "pitch", config) is False
 
 
+def test_extract_first_name_helper():
+    from messenger import extract_first_name
+
+    assert extract_first_name("Dr. Jane Doe") == "Jane"
+    assert extract_first_name("Mr. John Smith") == "John"
+    assert extract_first_name("Prof. Alan Turing") == "Alan"
+    assert extract_first_name("Alice Johnson") == "Alice"
+    assert extract_first_name("Bob") == "Bob"
+    assert extract_first_name("View Alice") == "Alice"
+    assert extract_first_name("View") == "there"
+    assert extract_first_name("") == "there"
+
+
 def test_real_time_pipeline_9_people():
     import importlib
 

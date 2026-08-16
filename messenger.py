@@ -107,6 +107,8 @@ def search_employees(page, company_url, company_name, target_titles):
             name = re.sub(r"(?i)\s*(is\s+)?open\s+to\s+work.*", "", name)
             name = re.sub(r"(?i)\s*follows this page.*", "", name)
             name = re.sub(r"(?i)\s*works here.*", "", name)
+            name = re.sub(r"(?i)\s*\b\d+\s+mutual\s+connections?.*", "", name)
+            name = re.sub(r"(?i)\s*\bmutual\s+connections?.*", "", name)
             # Remove any trailing "’s profile" or similar
             name = re.sub(
                 r"(?i)(?:[’\'\`]s?|\bs)?\s*\b(profile|graphic link|picture|photo|link)\b.*",
@@ -130,6 +132,8 @@ def search_employees(page, company_url, company_name, target_titles):
                 "member",
                 "graphic link",
                 "picture",
+                "mutual connection",
+                "mutual connections",
             }
 
             if (
@@ -156,6 +160,65 @@ def search_employees(page, company_url, company_name, target_titles):
     return employees
 
 
+def extract_first_name(raw_name):
+    """
+    Extracts and sanitizes the first name from a raw profile name.
+    Handles titles, possessives, and trailing symbols, safely falling back to 'there' if empty or 'View'.
+    """
+    if not raw_name:
+        return "there"
+
+    name_parts = [p for p in raw_name.split() if p.strip()]
+
+    # If the first word is a title, take the second word
+    if len(name_parts) > 1 and name_parts[0].lower().replace(".", "") in [
+        "mr",
+        "ms",
+        "mrs",
+        "dr",
+        "prof",
+        "er",
+    ]:
+        first_name = name_parts[1]
+    elif len(name_parts) > 0:
+        first_name = name_parts[0]
+    else:
+        first_name = raw_name
+
+    first_name = re.sub(r"(?i)[’\'\`]s?(?=[\W\d_]*$)", "", first_name)
+    first_name = re.sub(r"[\W\d_]+$", "", first_name)
+
+    if not first_name.strip() or first_name.lower() == "view":
+        first_name = raw_name.strip()
+        if first_name.lower().startswith("view "):
+            first_name = re.sub(r"(?i)^view\s+", "", first_name)
+
+        first_name = first_name.split()[0] if first_name else "there"
+        first_name = re.sub(r"(?i)[’\'\`]s?(?=[\W\d_]*$)", "", first_name)
+        first_name = re.sub(r"[\W\d_]+$", "", first_name)
+
+        if first_name.lower() == "view" or not first_name.strip():
+            first_name = "there"
+
+    return first_name
+
+
+def construct_message(first_name, job, ai_pitch, config):
+    """
+    Constructs the connection request message using the first name and job details.
+    """
+    user_intro = getattr(config, "USER_INTRODUCTION", "").strip()
+    if user_intro:
+        message = f"Hi {first_name},\n\nI noticed the {job['title']} opening at {job['company']}.\n\n{user_intro}\n\nWould you be open to a quick chat or referring me?\n\nThanks!"
+    else:
+        message = f"Hi {first_name},\n\nI noticed the {job['title']} opening at {job['company']}. I'd be a great fit because {ai_pitch}\n\nWould you be open to a quick chat or referring me?\n\nThanks!"
+
+    if len(message) > 300:
+        message = message[:297] + "..."
+
+    return message
+
+
 def send_connection_request(page, employee, job, ai_pitch, config):
     """
     Navigates to profile and sends connection request with a note.
@@ -180,58 +243,10 @@ def send_connection_request(page, employee, job, ai_pitch, config):
         )
         return False
 
+    first_name = extract_first_name(employee["name"])
+    message = construct_message(first_name, job, ai_pitch, config)
+
     print(f"[Target] Contact: {employee['name']} ({employee['profile_url']})")
-
-    # Extract first name
-    # Clean up prefixes like Dr. or Mr. to get the actual first name
-    raw_name = employee["name"]
-    # Handle multiple spaces correctly to avoid empty strings
-    name_parts = [p for p in raw_name.split() if p.strip()]
-
-    # If the first word is a title, take the second word
-    if len(name_parts) > 1 and name_parts[0].lower().replace(".", "") in [
-        "mr",
-        "ms",
-        "mrs",
-        "dr",
-        "prof",
-        "er",
-    ]:
-        first_name = name_parts[1]
-    elif len(name_parts) > 0:
-        first_name = name_parts[0]
-    else:
-        first_name = raw_name
-
-    # Strip any trailing symbols or non-alpha characters from first name just to be safe
-    # Also correctly handle trailing possessives without breaking non-ASCII characters
-    first_name = re.sub(r"(?i)[’\'\`]s?(?=[\W\d_]*$)", "", first_name)
-    first_name = re.sub(r"[\W\d_]+$", "", first_name)
-
-    # Hard-fail check: If somehow we ended up with an empty first name, fallback to full raw name or generic
-    if not first_name.strip() or first_name.lower() == "view":
-        first_name = raw_name.strip()
-        # Fallback to avoid sending "Hi View" if raw name is still "view"
-        if first_name.lower().startswith("view "):
-            first_name = re.sub(r"(?i)^view\s+", "", first_name)
-
-        first_name = first_name.split()[0] if first_name else "there"
-        first_name = re.sub(r"(?i)[’\'\`]s?(?=[\W\d_]*$)", "", first_name)
-        first_name = re.sub(r"[\W\d_]+$", "", first_name)
-
-        if first_name.lower() == "view" or not first_name.strip():
-            first_name = "there"
-
-    user_intro = getattr(config, "USER_INTRODUCTION", "").strip()
-    if user_intro:
-        message = f"Hi {first_name},\n\nI noticed the {job['title']} opening at {job['company']}.\n\n{user_intro}\n\nWould you be open to a quick chat or referring me?\n\nThanks!"
-    else:
-        message = f"Hi {first_name},\n\nI noticed the {job['title']} opening at {job['company']}. I'd be a great fit because {ai_pitch}\n\nWould you be open to a quick chat or referring me?\n\nThanks!"
-
-    if len(message) > 300:
-        # LinkedIn connection note limit is 300 chars
-        message = message[:297] + "..."
-
     print(f"Draft Message:\n---\n{message}\n---")
 
     if config.DRY_RUN:
@@ -249,6 +264,36 @@ def send_connection_request(page, employee, job, ai_pitch, config):
         # Actually navigate and send
         page.goto(employee["profile_url"])
         page.wait_for_timeout(random.randint(3000, 5000))
+
+        # Close/minimize any open message overlay bubbles so they don't intercept focus or clicks
+        try:
+            page.evaluate("""() => {
+                const buttons = document.querySelectorAll(
+                    '.msg-overlay-bubble-header__control--close-btn, [data-control-name="overlay.close_conversation_bubble"], aside.msg-overlay-container [aria-label*="Close"], aside.msg-overlay-container [aria-label*="Minimize"]'
+                );
+                buttons.forEach(b => b.click());
+            }""")
+            page.wait_for_timeout(1000)
+        except Exception:
+            pass
+
+        # Extract and verify the real recipient name from the loaded profile page
+        try:
+            profile_h1 = page.locator("main h1, h1.text-heading-xlarge, .pv-top-card h1, div.ph5 h1").first
+            if profile_h1.count() > 0 and profile_h1.is_visible():
+                page_name = profile_h1.inner_text().strip()
+                if page_name and len(page_name) > 1:
+                    clean_page_name = page_name.split("\n")[0].strip()
+                    clean_page_name = re.sub(r"(?i)\s*(is\s+)?open\s+to\s+work.*", "", clean_page_name)
+                    clean_page_name = re.sub(r"(?i)\s*follows this page.*", "", clean_page_name)
+                    clean_page_name = " ".join(clean_page_name.split())
+                    if clean_page_name and clean_page_name.lower() != "view":
+                        employee["name"] = clean_page_name
+                        first_name = extract_first_name(clean_page_name)
+                        message = construct_message(first_name, job, ai_pitch, config)
+                        print(f"[Profile] Verified real name on page: {clean_page_name} (First name: {first_name})")
+        except Exception:
+            pass
 
         # Validate that the employee's current company or headline matches the target job company
         try:
@@ -277,17 +322,6 @@ def send_connection_request(page, employee, job, ai_pitch, config):
             print(
                 f"[Validation] Warning: Could not extract profile text for validation: {e}"
             )
-
-        # Close any open message overlay bubbles that might obscure the buttons
-        try:
-            close_buttons = page.locator(
-                "button.msg-overlay-bubble-header__control--close-btn:visible"
-            ).all()
-            for btn in close_buttons:
-                btn.evaluate("node => node.click()")
-            page.wait_for_timeout(1000)
-        except Exception:
-            pass
 
         # Click connect
         # Need to handle different variants of the Connect button
@@ -366,18 +400,19 @@ def send_connection_request(page, employee, job, ai_pitch, config):
             except Exception as e:  # noqa: BLE001
                 print(f"Failed to click other reason or modal connect: {e}")
 
-        # Add note
-        # If there are open messaging overlays, we should probably try to close them or ignore them, but for now we focus on the modal
+        # Add note strictly within connection dialog
+        modal = page.locator("div[role='dialog']:visible, div.send-invite:visible, div.artdeco-modal:visible").first
         add_note_selectors = [
-            "div[role='dialog'] button[aria-label='Add a note']:not([disabled]):visible",
-            "div[role='dialog'] button:has-text('Add a note'):not([disabled]):visible",
-            "div[role='dialog'] button:has-text('Add note'):not([disabled]):visible",
             "button[aria-label='Add a note']:not([disabled]):visible",
             "button:has-text('Add a note'):not([disabled]):visible",
             "button:has-text('Add note'):not([disabled]):visible",
             "button.artdeco-button--secondary:has-text('Add a note'):not([disabled]):visible",
         ]
-        add_note_btn = page.locator(", ".join(add_note_selectors)).first
+
+        if modal.count() > 0 and modal.is_visible():
+            add_note_btn = modal.locator(", ".join(add_note_selectors)).first
+        else:
+            add_note_btn = page.locator(", ".join(add_note_selectors)).first
 
         if add_note_btn.count() > 0 and add_note_btn.is_visible():
             try:
@@ -388,27 +423,43 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                     add_note_btn.click(force=True, timeout=5000)
                 page.wait_for_timeout(1000)
 
-                # Type message
-                msg_box = page.locator(
-                    "textarea[name='message']:visible, textarea#custom-message:visible, div[role='dialog'] textarea:visible"
-                ).first
+                # Locate textarea strictly in active connection modal
+                dialog = page.locator("div[role='dialog']:visible, div.send-invite:visible, div.artdeco-modal:visible").first
+                if dialog.count() > 0 and dialog.is_visible():
+                    msg_box = dialog.locator(
+                        "textarea[name='message']:visible, textarea#custom-message:visible, textarea:visible"
+                    ).first
+                else:
+                    msg_box = page.locator(
+                        "textarea[name='message']:visible, textarea#custom-message:visible, div[role='dialog'] textarea:visible"
+                    ).first
+
                 msg_box.fill(message, timeout=5000)
                 page.wait_for_timeout(random.randint(1000, 2000))
 
-                # Click send
+                # Click send strictly within connection modal
                 send_selectors = [
                     "button[aria-label='Send invitation']:visible",
                     "button[aria-label='Send now']:visible",
                     "button:has-text('Send'):visible",
-                    "button:has-text('Send without a note'):visible",  # Sometimes the button text changes
+                    "button:has-text('Send without a note'):visible",
                 ]
-                send_btn = (
-                    page.locator(", ".join(send_selectors))
-                    .filter(has_text=re.compile(r"Send|Send now", re.IGNORECASE))
-                    .first
-                )
-                if send_btn.count() == 0:
-                    send_btn = page.locator(", ".join(send_selectors)).first
+                if dialog.count() > 0 and dialog.is_visible():
+                    send_btn = (
+                        dialog.locator(", ".join(send_selectors))
+                        .filter(has_text=re.compile(r"Send|Send now", re.IGNORECASE))
+                        .first
+                    )
+                    if send_btn.count() == 0:
+                        send_btn = dialog.locator(", ".join(send_selectors)).first
+                else:
+                    send_btn = (
+                        page.locator(", ".join(send_selectors))
+                        .filter(has_text=re.compile(r"Send|Send now", re.IGNORECASE))
+                        .first
+                    )
+                    if send_btn.count() == 0:
+                        send_btn = page.locator(", ".join(send_selectors)).first
 
                 try:
                     send_btn.evaluate("node => node.click()")
@@ -434,47 +485,8 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                 return False
         else:
             print(
-                "Could not find 'Add a note' button. Checking if it's already a direct message modal..."
+                f"Could not find 'Add a note' button on connection modal for {employee['name']}. Skipping outreach."
             )
-            # Debug: what modal is currently open?
-            modal = page.locator("div[role='dialog']:visible").first
-            if modal.count() > 0 and modal.is_visible():
-                print(f"DEBUG: Visible modal text: {modal.inner_text()[:300]}")
-            else:
-                print("DEBUG: No dialog is visible on the page.")
-
-            # Maybe it went straight to messaging modal if we have premium or they have open profile
-            msg_box = page.locator(
-                "textarea[name='message']:visible, textarea#custom-message:visible, div[role='dialog'] textarea:visible"
-            ).first
-            if msg_box.count() > 0 and msg_box.is_visible():
-                try:
-                    msg_box.fill(message, timeout=5000)
-                    page.wait_for_timeout(1000)
-                    send_btn = page.locator(
-                        "button[aria-label='Send']:visible, button:has-text('Send'):visible"
-                    ).first
-                    try:
-                        send_btn.evaluate("node => node.click()")
-                    except Exception as e:
-                        print(f"Evaluate Send error: {e}")
-                        send_btn.click(force=True, timeout=5000)
-
-                    print(
-                        f"Successfully sent direct message/inmail to {employee['name']}"
-                    )
-                    log_user_messaged(
-                        employee["profile_url"],
-                        employee["name"],
-                        employee["company"],
-                        job["job_id"],
-                    )
-                    page.wait_for_timeout(random.randint(15000, 30000))
-                    return True
-                except Exception as e:  # noqa: BLE001
-                    print(f"Error sending direct message: {e}")
-                    return False
-
             return False
 
     except Exception as e:  # noqa: BLE001
