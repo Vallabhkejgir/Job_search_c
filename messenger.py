@@ -225,21 +225,11 @@ def send_connection_request(page, employee, job, ai_pitch, config):
     Extracts and sanitizes the first name by handling titles, possessives, and trailing symbols, safely falling back to 'there' if the name resolves exclusively to 'View' or is empty, to avoid broken messages.
     Validates that the employee's company matches the job opening company before drafting or sending outreach.
     """
-    emp_company = (employee.get("company") or "").strip()
     job_company = (job.get("company") or "").strip()
 
-    if not emp_company or not job_company:
+    if not job_company:
         print(
-            f"[Validation] Missing company info (Employee: '{emp_company}', Job: '{job_company}'). Skipping message."
-        )
-        return False
-
-    emp_norm = re.sub(r"[^\w\s]", "", emp_company).strip().lower()
-    job_norm = re.sub(r"[^\w\s]", "", job_company).strip().lower()
-
-    if emp_norm != job_norm and emp_norm not in job_norm and job_norm not in emp_norm:
-        print(
-            f"[Validation] Company mismatch: Employee company '{emp_company}' does not match Job company '{job_company}'. Skipping message."
+            f"[Validation] Missing company info (Job: '{job_company}'). Skipping message."
         )
         return False
 
