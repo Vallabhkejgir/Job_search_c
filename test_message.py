@@ -265,6 +265,44 @@ class MockPlaywright:
         pass
 
 
+def test_company_matching_validation():
+    class MockPage:
+        def goto(self, url, **kwargs):
+            pass
+
+        def wait_for_timeout(self, timeout):
+            pass
+
+    import messenger
+
+    messenger.log_user_messaged = mock_log_user_messaged
+    config.DRY_RUN = True
+
+    # 1. Matching company
+    emp_match = {"name": "Alice Smith", "profile_url": "https://linkedin.com/in/alicesmith", "company": "Google"}
+    job_match = {"title": "Software Engineer", "company": "Google", "job_id": "1"}
+    assert send_connection_request(MockPage(), emp_match, job_match, "pitch", config) is True
+
+    # 2. Case-insensitive and normalized match
+    emp_norm = {"name": "Bob Jones", "profile_url": "https://linkedin.com/in/bobjones", "company": "Google LLC"}
+    job_norm = {"title": "AI Engineer", "company": "Google", "job_id": "2"}
+    assert send_connection_request(MockPage(), emp_norm, job_norm, "pitch", config) is True
+
+    # 3. Mismatched company
+    emp_mismatch = {"name": "Charlie Brown", "profile_url": "https://linkedin.com/in/charliebrown", "company": "Microsoft"}
+    job_mismatch = {"title": "Product Manager", "company": "Apple", "job_id": "3"}
+    assert send_connection_request(MockPage(), emp_mismatch, job_mismatch, "pitch", config) is False
+
+    # 4. Missing company info
+    emp_no_comp = {"name": "Dave Wilson", "profile_url": "https://linkedin.com/in/davewilson", "company": ""}
+    job_no_comp = {"title": "Data Scientist", "company": "Amazon", "job_id": "4"}
+    assert send_connection_request(MockPage(), emp_no_comp, job_no_comp, "pitch", config) is False
+
+    emp_comp = {"name": "Eve Adams", "profile_url": "https://linkedin.com/in/eveadams", "company": "Amazon"}
+    job_missing = {"title": "Data Scientist", "company": "", "job_id": "5"}
+    assert send_connection_request(MockPage(), emp_comp, job_missing, "pitch", config) is False
+
+
 def test_real_time_pipeline_9_people():
     import importlib
 
