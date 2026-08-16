@@ -4,7 +4,7 @@ An automated agent that searches for recent job postings on LinkedIn and automat
 
 ## Features
 - **Stealthy Browser Automation:** Uses Playwright with an unauthenticated session to bypass job search redirects, and a persistent session to securely message contacts.
-- **Automated Outreach:** Automatically drafts a connection request and sends it to recruiters or engineering managers at the hiring company (validates employee company matches job company before sending).
+- **Automated Outreach:** Automatically drafts a connection request and sends it to recruiters or engineering managers at the hiring company (verifies actual recipient name on profile page load and validates employee company matches job company before sending).
 - **Idempotent & Safe:** Uses SQLite to track processed jobs and messaged users, and a lockfile to prevent concurrent runs. Respects strict rate limits and ensures browser resources are cleanly released.
 
 ## Setup
