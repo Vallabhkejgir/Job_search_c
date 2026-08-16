@@ -27,6 +27,7 @@ def test_global_company_limit(
     mock_init,
     mock_log,
     mock_get_total,
+    capsys,
 ):
     mock_exists.return_value = True
     config.MAX_PEOPLE_PER_COMPANY = 2
@@ -64,15 +65,11 @@ def test_global_company_limit(
 
     mock_send.return_value = True
 
-    # Capture stdout
-    captured_output = io.StringIO()
-    sys.stdout = captured_output
-
     main()
 
-    sys.stdout = sys.__stdout__
+    captured = capsys.readouterr()
+    output = captured.out
 
-    output = captured_output.getvalue()
     print("STDOUT from main():")
     print(output)
 

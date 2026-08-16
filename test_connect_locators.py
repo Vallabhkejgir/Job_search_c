@@ -11,6 +11,10 @@ HTML_SCENARIO_2_MORE_CONNECT = """
 </head>
 <body>
     <main>
+        <section>
+            <h1>Jane Doe</h1>
+            <p>Engineer at TestCorp</p>
+        </section>
         <button aria-label="More actions" id="more-btn">More</button>
     </main>
     <div id="dropdown" class="artdeco-dropdown__content" style="display: none;">

@@ -1,0 +1,799 @@
+diff --git a/.gitignore b/.gitignore
+index c538770..d754f2c 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -5,3 +5,6 @@ __pycache__/
+ session/
+ linkedin_agent.db
+ agent.lock
++jobs.db
++test_run*.log
++wait_test.sh
+diff --git a/main.py b/main.py
+index 2b9c623..2afa48a 100644
+--- a/main.py
++++ b/main.py
+@@ -44,6 +44,7 @@ def main():
+             return
+ 
+         messages_sent_today = 0
++        company_message_counts = {}
+ 
+         with sync_playwright() as p:
+             total_jobs_found_in_run = 0
+@@ -61,8 +62,12 @@ def main():
+                     args=["--disable-blink-features=AutomationControlled"],
+                 )
+                 try:
+-                    public_page = public_browser.new_page(viewport={"width": 1280, "height": 800})
+-                    num_cards, card_selector = load_job_search_page(public_page, config, start)
++                    public_page = public_browser.new_page(
++                        viewport={"width": 1280, "height": 800}
++                    )
++                    num_cards, card_selector = load_job_search_page(
++                        public_page, config, start
++                    )
+ 
+                     if num_cards == 0:
+                         if start == 0:
+@@ -86,23 +91,42 @@ def main():
+                     company_name = job["company"]
+                     if company_name not in processed_company_names:
+                         if companies_processed >= config.MAX_COMPANIES_TO_PROCESS:
+-                            print(f"Reached MAX_COMPANIES_TO_PROCESS limit ({config.MAX_COMPANIES_TO_PROCESS}). Stopping.")
++                            print(
++                                f"Reached MAX_COMPANIES_TO_PROCESS limit ({config.MAX_COMPANIES_TO_PROCESS}). Stopping."
++                            )
+                             break
+                         processed_company_names.add(company_name)
+                         companies_processed += 1
+ 
+                     match_reason = f"Relevant opening for {job['title']}"
+-                    target_titles = ["Recruiter", "Engineering Manager", "Hiring Manager"]
++                    target_titles = [
++                        "Recruiter",
++                        "Engineering Manager",
++                        "Hiring Manager",
++                    ]
+ 
+                     # Log job
+-                    log_job_processed(job["job_id"], job["title"], job["company"], True, match_reason)
++                    log_job_processed(
++                        job["job_id"], job["title"], job["company"], True, match_reason
++                    )
+                     print(f"Processing job match: {job['title']} at {job['company']}")
+ 
+                     # Check daily message limit
+                     if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
+-                        print(f"Daily message limit ({config.MAX_MESSAGES_PER_DAY}) reached. Skipping messaging.")
++                        print(
++                            f"Daily message limit ({config.MAX_MESSAGES_PER_DAY}) reached. Skipping messaging."
++                        )
+                         break
+ 
++                    messaged_for_this_company = company_message_counts.get(
++                        company_name, 0
++                    )
++                    if messaged_for_this_company >= config.MAX_PEOPLE_PER_COMPANY:
++                        print(
++                            f"Company limit ({config.MAX_PEOPLE_PER_COMPANY}) reached for {company_name}. Skipping outreach."
++                        )
++                        continue
++
+                     # Launch authenticated context per job
+                     auth_context = p.chromium.launch_persistent_context(
+                         user_data_dir=SESSION_DIR,
+@@ -112,7 +136,11 @@ def main():
+                     )
+ 
+                     try:
+-                        auth_page = auth_context.pages[0] if auth_context.pages else auth_context.new_page()
++                        auth_page = (
++                            auth_context.pages[0]
++                            if auth_context.pages
++                            else auth_context.new_page()
++                        )
+ 
+                         employees = search_employees(
+                             auth_page,
+@@ -121,18 +149,28 @@ def main():
+                             target_titles,
+                         )
+ 
+-                        messaged_for_this_company = 0
++                        messaged_for_this_company = company_message_counts.get(
++                            company_name, 0
++                        )
+                         for emp in employees:
+                             if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
+                                 break
+-                            if messaged_for_this_company >= config.MAX_PEOPLE_PER_COMPANY:
++                            if (
++                                messaged_for_this_company
++                                >= config.MAX_PEOPLE_PER_COMPANY
++                            ):
+                                 break
+ 
+-                            success = send_connection_request(auth_page, emp, job, match_reason, config)
++                            success = send_connection_request(
++                                auth_page, emp, job, match_reason, config
++                            )
+ 
+                             if success:
+                                 messages_sent_today += 1
+                                 messaged_for_this_company += 1
++                                company_message_counts[company_name] = (
++                                    messaged_for_this_company
++                                )
+ 
+                     except Exception as e:  # noqa: BLE001
+                         print(f"Error processing outreach for {job['company']}: {e}")
+@@ -140,7 +178,10 @@ def main():
+                         auth_context.close()
+ 
+                 # Check global limits before loading the next page
+-                if companies_processed >= config.MAX_COMPANIES_TO_PROCESS or messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
++                if (
++                    companies_processed >= config.MAX_COMPANIES_TO_PROCESS
++                    or messages_sent_today >= config.MAX_MESSAGES_PER_DAY
++                ):
+                     break
+ 
+                 # Move to the next page
+diff --git a/messenger.py b/messenger.py
+index 34cb256..6f24fc3 100644
+--- a/messenger.py
++++ b/messenger.py
+@@ -160,7 +160,26 @@ def send_connection_request(page, employee, job, ai_pitch, config):
+     """
+     Navigates to profile and sends connection request with a note.
+     Extracts and sanitizes the first name by handling titles, possessives, and trailing symbols, safely falling back to 'there' if the name resolves exclusively to 'View' or is empty, to avoid broken messages.
++    Validates that the employee's company matches the job opening company before drafting or sending outreach.
+     """
++    emp_company = (employee.get("company") or "").strip()
++    job_company = (job.get("company") or "").strip()
++
++    if not emp_company or not job_company:
++        print(
++            f"[Validation] Missing company info (Employee: '{emp_company}', Job: '{job_company}'). Skipping message."
++        )
++        return False
++
++    emp_norm = re.sub(r"[^\w\s]", "", emp_company).strip().lower()
++    job_norm = re.sub(r"[^\w\s]", "", job_company).strip().lower()
++
++    if emp_norm != job_norm and emp_norm not in job_norm and job_norm not in emp_norm:
++        print(
++            f"[Validation] Company mismatch: Employee company '{emp_company}' does not match Job company '{job_company}'. Skipping message."
++        )
++        return False
++
+     print(f"[Target] Contact: {employee['name']} ({employee['profile_url']})")
+ 
+     # Extract first name
+@@ -231,64 +250,202 @@ def send_connection_request(page, employee, job, ai_pitch, config):
+         page.goto(employee["profile_url"])
+         page.wait_for_timeout(random.randint(3000, 5000))
+ 
++        # Close any open message overlay bubbles that might obscure the buttons
++        try:
++            close_buttons = page.locator("button.msg-overlay-bubble-header__control--close-btn:visible").all()
++            for btn in close_buttons:
++                btn.evaluate("node => node.click()")
++            page.wait_for_timeout(1000)
++        except Exception as e:
++            pass
++
+         # Click connect
+-        connect_btn = page.locator(
+-            "main button:has-text('Connect'), main a:has-text('Connect'), button[aria-label*='Connect'], button[aria-label*='Invite']"
+-        ).first
++        # Need to handle different variants of the Connect button
++        connect_selectors = [
++            "button.pvs-profile-actions__action:has-text('Connect'):not([disabled]):visible",
++            "button[aria-label*='Invite']:not([disabled]):visible",
++            "button[aria-label*='Connect']:not([disabled]):visible",
++            "main button:has-text('Connect'):not([disabled]):visible",
++            "main a:has-text('Connect'):not([disabled]):visible",
++            "button:has-text('Connect'):not([disabled]):visible"
++        ]
++        connect_btn = page.locator(", ".join(connect_selectors)).first
++
+         if connect_btn.count() == 0 or not connect_btn.is_visible():
+             # Sometimes it's under 'More'
+-            more_btn = page.locator(
+-                "main button[aria-label='More actions'], main button[aria-label='More']"
+-            ).first
+-            if more_btn.count() > 0:
++            more_selectors = [
++                "button.pvs-profile-actions__action:has-text('More'):visible",
++                "button[aria-label='More actions']:visible",
++                "button[aria-label='More']:visible",
++                "main button:has-text('More'):visible",
++            ]
++            more_btn = page.locator(", ".join(more_selectors)).first
++            if more_btn.count() > 0 and more_btn.is_visible():
+                 more_btn.click(force=True)
+-                page.wait_for_timeout(1000)
+-                connect_btn = page.locator(
+-                    "div[role='menu'] *:has-text('Connect'), div.artdeco-dropdown__content *:has-text('Connect'), ul *:has-text('Connect')"
+-                ).first
++                page.wait_for_timeout(1500)
++
++                # After clicking More, look for Connect in the dropdown
++                dropdown_connect = [
++                    "div.artdeco-dropdown__content button:has-text('Connect'):visible",
++                    "div.artdeco-dropdown__content span:has-text('Connect'):visible",
++                    "ul *:has-text('Connect'):visible",
++                    "div[role='menu'] *:has-text('Connect'):visible",
++                ]
++                connect_btn = page.locator(", ".join(dropdown_connect)).first
+ 
+-        if connect_btn.count() == 0:
++        if connect_btn.count() == 0 or not connect_btn.is_visible():
+             print(f"Could not find Connect button for {employee['name']}")
+             return False
+ 
+-        connect_btn.click(force=True)
++        # Use click(force=True) to avoid interception but wrap in try-except
++        try:
++            try:
++                connect_btn.evaluate("node => node.click()")
++            except Exception as e:
++                print(f"Evaluate Connect error: {e}")
++                connect_btn.click(force=True, timeout=5000)
++        except Exception as e:  # noqa: BLE001
++            print(f"Failed to click Connect button: {e}")
++            return False
++
+         page.wait_for_timeout(random.randint(1500, 2500))
+ 
+-        # Add note
+-        add_note_btn = page.locator(
+-            "button:has-text('Add a note'), button[aria-label='Add a note'], button:has-text('Add note')"
++        # Handle 'Other' connection reason if LinkedIn asks how we know the person
++        other_reason_btn = page.locator(
++            "button[aria-label*='Other']:not([disabled]):visible, button:has-text('Other'):not([disabled]):visible"
+         ).first
+-        if add_note_btn.count() > 0:
+-            add_note_btn.click(force=True)
+-            page.wait_for_timeout(1000)
++        if other_reason_btn.count() > 0 and other_reason_btn.is_visible():
++            try:
++                try:
++                    other_reason_btn.evaluate("node => node.click()")
++                except Exception as e:
++                    print(f"Evaluate Other reason error: {e}")
++                    other_reason_btn.click(force=True, timeout=3000)
++                page.wait_for_timeout(1000)
++                # Click Connect again on the modal
++                modal_connect = page.locator(
++                    "button[aria-label='Connect']:visible, div[role='dialog'] button.artdeco-button--primary:visible"
++                ).first
++                if modal_connect.count() > 0 and modal_connect.is_visible():
++                    try:
++                        modal_connect.evaluate("node => node.click()")
++                    except Exception as e:
++                        print(f"Evaluate modal Connect error: {e}")
++                        modal_connect.click(force=True, timeout=3000)
++                    page.wait_for_timeout(1500)
++            except Exception as e:  # noqa: BLE001
++                print(f"Failed to click other reason or modal connect: {e}")
+ 
+-            # Type message
+-            page.locator(
+-                "textarea[name='message'], textarea#custom-message, textarea"
+-            ).first.fill(message)
+-            page.wait_for_timeout(random.randint(1000, 2000))
++        # Add note
++        # If there are open messaging overlays, we should probably try to close them or ignore them, but for now we focus on the modal
++        # Add note
++        add_note_selectors = [
++            "div[role='dialog'] button[aria-label='Add a note']:not([disabled]):visible",
++            "div[role='dialog'] button:has-text('Add a note'):not([disabled]):visible",
++            "div[role='dialog'] button:has-text('Add note'):not([disabled]):visible",
++            "button[aria-label='Add a note']:not([disabled]):visible",
++            "button:has-text('Add a note'):not([disabled]):visible",
++            "button:has-text('Add note'):not([disabled]):visible",
++            "button.artdeco-button--secondary:has-text('Add a note'):not([disabled]):visible",
++        ]
++        add_note_btn = page.locator(", ".join(add_note_selectors)).first
++
++        if add_note_btn.count() > 0 and add_note_btn.is_visible():
++            try:
++                try:
++                    add_note_btn.evaluate("node => node.click()")
++                except Exception as e:
++                    print(f"Evaluate Add note error: {e}")
++                    add_note_btn.click(force=True, timeout=5000)
++                page.wait_for_timeout(1000)
+ 
+-            # Click send
+-            send_btn = page.locator(
+-                "button:has-text('Send'), button[aria-label='Send invitation'], button[aria-label='Send now']"
+-            ).first
+-            send_btn.click(force=True)
+-
+-            print(f"Successfully sent connection request to {employee['name']}")
+-            log_user_messaged(
+-                employee["profile_url"],
+-                employee["name"],
+-                employee["company"],
+-                job["job_id"],
++                # Type message
++                msg_box = page.locator(
++                    "textarea[name='message']:visible, textarea#custom-message:visible, div[role='dialog'] textarea:visible"
++                ).first
++                msg_box.fill(message, timeout=5000)
++                page.wait_for_timeout(random.randint(1000, 2000))
++
++                # Click send
++                send_selectors = [
++                    "button[aria-label='Send invitation']:visible",
++                    "button[aria-label='Send now']:visible",
++                    "button:has-text('Send'):visible",
++                    "button:has-text('Send without a note'):visible",  # Sometimes the button text changes
++                ]
++                send_btn = (
++                    page.locator(", ".join(send_selectors))
++                    .filter(has_text=re.compile(r"Send|Send now", re.IGNORECASE))
++                    .first
++                )
++                if send_btn.count() == 0:
++                    send_btn = page.locator(", ".join(send_selectors)).first
++
++                try:
++                    send_btn.evaluate("node => node.click()")
++                except Exception as e:
++                    print(f"Evaluate Send error: {e}")
++                    send_btn.click(force=True, timeout=5000)
++
++                print(f"Successfully sent connection request to {employee['name']}")
++                log_user_messaged(
++                    employee["profile_url"],
++                    employee["name"],
++                    employee["company"],
++                    job["job_id"],
++                )
++
++                # Sleep to avoid rate limits
++                sleep_time = random.randint(15000, 30000)
++                print(f"Sleeping for {sleep_time / 1000}s to avoid rate limits...")
++                page.wait_for_timeout(sleep_time)
++                return True
++            except Exception as e:  # noqa: BLE001
++                print(f"Error while interacting with connection modal: {e}")
++                return False
++        else:
++            print(
++                "Could not find 'Add a note' button. Checking if it's already a direct message modal..."
+             )
++            # Debug: what modal is currently open?
++            modal = page.locator("div[role='dialog']:visible").first
++            if modal.count() > 0 and modal.is_visible():
++                print(f"DEBUG: Visible modal text: {modal.inner_text()[:300]}")
++            else:
++                print("DEBUG: No dialog is visible on the page.")
++
++            # Maybe it went straight to messaging modal if we have premium or they have open profile
++            msg_box = page.locator(
++                "textarea[name='message']:visible, textarea#custom-message:visible, div[role='dialog'] textarea:visible"
++            ).first
++            if msg_box.count() > 0 and msg_box.is_visible():
++                try:
++                    msg_box.fill(message, timeout=5000)
++                    page.wait_for_timeout(1000)
++                    send_btn = page.locator(
++                        "button[aria-label='Send']:visible, button:has-text('Send'):visible"
++                    ).first
++                    try:
++                        send_btn.evaluate("node => node.click()")
++                    except Exception as e:
++                        print(f"Evaluate Send error: {e}")
++                        send_btn.click(force=True, timeout=5000)
++
++                    print(
++                        f"Successfully sent direct message/inmail to {employee['name']}"
++                    )
++                    log_user_messaged(
++                        employee["profile_url"],
++                        employee["name"],
++                        employee["company"],
++                        job["job_id"],
++                    )
++                    page.wait_for_timeout(random.randint(15000, 30000))
++                    return True
++                except Exception as e:  # noqa: BLE001
++                    print(f"Error sending direct message: {e}")
++                    return False
+ 
+-            # Sleep to avoid rate limits
+-            sleep_time = random.randint(15000, 30000)
+-            print(f"Sleeping for {sleep_time / 1000}s to avoid rate limits...")
+-            page.wait_for_timeout(sleep_time)
+-            return True
+-        else:
+-            print("Could not find 'Add a note' button.")
+             return False
+ 
+     except Exception as e:  # noqa: BLE001
+diff --git a/test_company_message_limit_global.py b/test_company_message_limit_global.py
+new file mode 100644
+index 0000000..c3fc9ad
+--- /dev/null
++++ b/test_company_message_limit_global.py
+@@ -0,0 +1,87 @@
++import io
++import sys
++from unittest.mock import patch
++
++import pytest
++
++import config
++from main import main
++
++
++@patch("main.get_total_jobs_in_db")
++@patch("main.log_job_processed")
++@patch("main.init_db")
++@patch("main.search_employees")
++@patch("main.send_connection_request")
++@patch("main.load_job_search_page")
++@patch("main.extract_job_from_card")
++@patch("main.sync_playwright")
++@patch("os.path.exists")
++def test_global_company_limit(
++    mock_exists,
++    mock_playwright,
++    mock_extract,
++    mock_load_page,
++    mock_send,
++    mock_search,
++    mock_init,
++    mock_log,
++    mock_get_total,
++):
++    mock_exists.return_value = True
++    config.MAX_PEOPLE_PER_COMPANY = 2
++    config.MAX_MESSAGES_PER_DAY = 100
++    config.MAX_COMPANIES_TO_PROCESS = 10
++
++    mock_load_page.side_effect = [(3, "div.card"), (0, "div.card")]
++
++    mock_extract.side_effect = [
++        {
++            "job_id": "1",
++            "title": "Software Engineer",
++            "company": "Tech Corp",
++            "company_url": "url",
++        },
++        {
++            "job_id": "2",
++            "title": "Senior Engineer",
++            "company": "Tech Corp",
++            "company_url": "url",
++        },
++        {
++            "job_id": "3",
++            "title": "Principal Engineer",
++            "company": "Tech Corp",
++            "company_url": "url",
++        },
++    ]
++
++    mock_search.side_effect = [
++        [{"name": "Alice"}],  # 1 for first job
++        [{"name": "Bob"}, {"name": "Charlie"}],  # 2 for second job
++        [{"name": "Dave"}],  # 1 for third job
++    ]
++
++    mock_send.return_value = True
++
++    # Capture stdout
++    captured_output = io.StringIO()
++    sys.stdout = captured_output
++
++    main()
++
++    sys.stdout = sys.__stdout__
++
++    output = captured_output.getvalue()
++    print("STDOUT from main():")
++    print(output)
++
++    assert mock_send.call_count == 2
++    called_names = [call.args[1]["name"] for call in mock_send.call_args_list]
++    assert called_names == ["Alice", "Bob"]
++
++    assert "Company limit (2) reached for Tech Corp. Skipping outreach." in output
++
++
++if __name__ == "__main__":
++    pytest.main(["-v", "test_company_message_limit_global.py"])
+diff --git a/test_message.py b/test_message.py
+index 3c32521..ade2984 100644
+--- a/test_message.py
++++ b/test_message.py
+@@ -74,7 +74,6 @@ def test_user_introduction_env():
+     print("Test passed!")
+ 
+ 
+-
+ import os
+ from unittest.mock import patch
+ 
+@@ -89,6 +88,9 @@ class MockLocator:
+             self.html = html
+             self.attrs = attrs or {}
+ 
++    def filter(self, **kwargs):
++        return self
++
+     def count(self):
+         return len(self.elements)
+ 
+@@ -137,20 +139,24 @@ class MockLocator:
+     def locator(self, selector):
+         if self.elements and self.elements[0] is not self:
+             return self.elements[0].locator(selector)
+-            
++
+         if "xpath=parent" in selector:
+             return MockLocator([MockLocator(text="Mocked job description")])
+         if "img" in selector:
+             return MockLocator([])
+         return MockLocator([])
+ 
++
+ class MockPageE2E:
+     def __init__(self):
+         self.url = "https://www.linkedin.com/jobs/search/"
++
+         class Mouse:
+-            def wheel(self, delta_x, delta_y): pass
++            def wheel(self, delta_x, delta_y):
++                pass
++
+         self.mouse = Mouse()
+-        
++
+     def goto(self, url, **kwargs):
+         self.url = url
+ 
+@@ -164,34 +170,49 @@ class MockPageE2E:
+         return ""
+ 
+     def locator(self, selector):
+-        if "base-search-card" in selector or "job-card-container" in selector or "job-search-card" in selector:
+-            return MockLocator([MockLocator(
+-                html="<div class='title'>Software Engineer</div><div class='subtitle'>Acme Corp</div><a href='/company/acme'>Acme Corp</a>",
+-                text="Software Engineer\\nAcme Corp",
+-                attrs={"data-entity-urn": "urn:li:jobPosting:123456789", "href": "/jobs/view/123"}
+-            )])
++        if (
++            "base-search-card" in selector
++            or "job-card-container" in selector
++            or "job-search-card" in selector
++        ):
++            return MockLocator(
++                [
++                    MockLocator(
++                        html="<div class='title'>Software Engineer</div><div class='subtitle'>Acme Corp</div><a href='/company/acme'>Acme Corp</a>",
++                        text="Software Engineer\\nAcme Corp",
++                        attrs={
++                            "data-entity-urn": "urn:li:jobPosting:123456789",
++                            "href": "/jobs/view/123",
++                        },
++                    )
++                ]
++            )
+         if "a[href*='/jobs/view/'] h2" in selector:
+             return MockLocator([MockLocator(text="Software Engineer")])
+         if "h1" in selector or "h2.t-24" in selector:
+             return MockLocator([MockLocator(text="Software Engineer")])
+         if 'a[href*="/company/"]' in selector:
+-            return MockLocator([MockLocator(text="Acme Corp", attrs={"href": "/company/acme/"})])
++            return MockLocator(
++                [MockLocator(text="Acme Corp", attrs={"href": "/company/acme/"})]
++            )
+         if "About the job" in selector or "About the role" in selector:
+             return MockLocator([MockLocator(text="About the job")])
+         if "#job-details" in selector or ".jobs-description" in selector:
+             return MockLocator([MockLocator(html="<p>Job description details...</p>")])
+-            
++
+         if "input" in selector and "Search employees" in selector:
+             return MockLocator([MockLocator(text="")])
+         if "a[href*='/in/']" in selector:
+             locators = []
+             for i in range(1, 10):
+-                locators.append(MockLocator(
+-                    text=f"Person {i}",
+-                    attrs={"href": f"https://linkedin.com/in/person{i}"}
+-                ))
++                locators.append(
++                    MockLocator(
++                        text=f"Person {i}",
++                        attrs={"href": f"https://linkedin.com/in/person{i}"},
++                    )
++                )
+             return MockLocator(locators)
+-            
++
+         if "Connect" in selector or "Invite" in selector:
+             return MockLocator([MockLocator()])
+         if "Add a note" in selector or "Add note" in selector:
+@@ -200,28 +221,86 @@ class MockPageE2E:
+             return MockLocator([MockLocator()])
+         if "textarea" in selector:
+             return MockLocator([MockLocator()])
+-            
++
+         return MockLocator([])
+ 
++
+ class MockContext:
+     @property
+-    def pages(self): return []
+-    def new_page(self, **kwargs): return MockPageE2E()
+-    def close(self): pass
++    def pages(self):
++        return []
++
++    def new_page(self, **kwargs):
++        return MockPageE2E()
++
++    def close(self):
++        pass
++
+ 
+ class MockBrowser:
+-    def new_page(self, **kwargs): return MockPageE2E()
+-    def close(self): pass
++    def new_page(self, **kwargs):
++        return MockPageE2E()
++
++    def close(self):
++        pass
++
+ 
+ class Chromium:
+-    def launch(self, **kwargs): return MockBrowser()
+-    def launch_persistent_context(self, **kwargs): return MockContext()
++    def launch(self, **kwargs):
++        return MockBrowser()
++
++    def launch_persistent_context(self, **kwargs):
++        return MockContext()
++
+ 
+ class MockPlaywright:
+     @property
+-    def chromium(self): return Chromium()
+-    def __enter__(self): return self
+-    def __exit__(self, *args): pass
++    def chromium(self):
++        return Chromium()
++
++    def __enter__(self):
++        return self
++
++    def __exit__(self, *args):
++        pass
++
++
++def test_company_matching_validation():
++    class MockPage:
++        def goto(self, url, **kwargs):
++            pass
++
++        def wait_for_timeout(self, timeout):
++            pass
++
++    import messenger
++
++    messenger.log_user_messaged = mock_log_user_messaged
++    config.DRY_RUN = True
++
++    # 1. Matching company
++    emp_match = {"name": "Alice Smith", "profile_url": "https://linkedin.com/in/alicesmith", "company": "Google"}
++    job_match = {"title": "Software Engineer", "company": "Google", "job_id": "1"}
++    assert send_connection_request(MockPage(), emp_match, job_match, "pitch", config) is True
++
++    # 2. Case-insensitive and normalized match
++    emp_norm = {"name": "Bob Jones", "profile_url": "https://linkedin.com/in/bobjones", "company": "Google LLC"}
++    job_norm = {"title": "AI Engineer", "company": "Google", "job_id": "2"}
++    assert send_connection_request(MockPage(), emp_norm, job_norm, "pitch", config) is True
++
++    # 3. Mismatched company
++    emp_mismatch = {"name": "Charlie Brown", "profile_url": "https://linkedin.com/in/charliebrown", "company": "Microsoft"}
++    job_mismatch = {"title": "Product Manager", "company": "Apple", "job_id": "3"}
++    assert send_connection_request(MockPage(), emp_mismatch, job_mismatch, "pitch", config) is False
++
++    # 4. Missing company info
++    emp_no_comp = {"name": "Dave Wilson", "profile_url": "https://linkedin.com/in/davewilson", "company": ""}
++    job_no_comp = {"title": "Data Scientist", "company": "Amazon", "job_id": "4"}
++    assert send_connection_request(MockPage(), emp_no_comp, job_no_comp, "pitch", config) is False
++
++    emp_comp = {"name": "Eve Adams", "profile_url": "https://linkedin.com/in/eveadams", "company": "Amazon"}
++    job_missing = {"title": "Data Scientist", "company": "", "job_id": "5"}
++    assert send_connection_request(MockPage(), emp_comp, job_missing, "pitch", config) is False
+ 
+ 
+ def test_real_time_pipeline_9_people():
+@@ -231,6 +310,7 @@ def test_real_time_pipeline_9_people():
+     import database
+     import main
+     import messenger
++
+     importlib.reload(database)
+     importlib.reload(messenger)
+ 
+@@ -240,22 +320,27 @@ def test_real_time_pipeline_9_people():
+     config.MAX_PEOPLE_PER_COMPANY = 9
+     config.MAX_COMPANIES_TO_PROCESS = 10
+     config.DRY_RUN = False
+-    
++
+     # Use test database
+     import database
++
+     database.DB_NAME = "test_linkedin_agent.db"
+     if os.path.exists(database.DB_NAME):
+         os.remove(database.DB_NAME)
+-        
++
+     original_exists = os.path.exists
++
+     def mock_exists(path):
+-        if path == main.SESSION_DIR: return True
++        if path == main.SESSION_DIR:
++            return True
+         return original_exists(path)
+ 
+-    with patch('main.sync_playwright', return_value=MockPlaywright()), \
+-         patch('os.path.exists', side_effect=mock_exists):
++    with (
++        patch("main.sync_playwright", return_value=MockPlaywright()),
++        patch("os.path.exists", side_effect=mock_exists),
++    ):
+         main.main()
+-        
++
+     # verify
+     conn = database.sqlite3.connect(database.DB_NAME)
+     c = conn.cursor()
+@@ -263,7 +348,7 @@ def test_real_time_pipeline_9_people():
+     count = c.fetchone()[0]
+     print(f"MESSAGED USERS: {count}")
+     assert count == 9, f"Expected 9 users messaged, got {count}"
+-    
++
+     if os.path.exists(database.DB_NAME):
+         os.remove(database.DB_NAME)
+ 
+diff --git a/test_message_empty_intro.py b/test_message_empty_intro.py
+index ebd278d..063c84d 100644
+--- a/test_message_empty_intro.py
++++ b/test_message_empty_intro.py
+@@ -1,16 +1,11 @@
++from unittest.mock import patch
++
+ import config
+-import messenger
+ from messenger import send_connection_request
+ 
+ 
+-def mock_log_user_messaged(url, name, company, job_id):
+-    pass
+-
+-
+-messenger.log_user_messaged = mock_log_user_messaged
+-
+-
+-def test_empty_introduction():
++@patch("messenger.log_user_messaged")
++def test_empty_introduction(mock_log):
+     class MockPage:
+         pass
+ 

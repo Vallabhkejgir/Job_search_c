@@ -166,9 +166,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
     job_company = (job.get("company") or "").strip()
 
     if not emp_company or not job_company:
-        print(
-            f"[Validation] Missing company info (Employee: '{emp_company}', Job: '{job_company}'). Skipping message."
-        )
+        print(f"[Validation] Missing company info (Employee: '{emp_company}', Job: '{job_company}'). Skipping message.")
         return False
 
     emp_norm = re.sub(r"[^\w\s]", "", emp_company).strip().lower()
@@ -249,6 +247,29 @@ def send_connection_request(page, employee, job, ai_pitch, config):
         # Actually navigate and send
         page.goto(employee["profile_url"])
         page.wait_for_timeout(random.randint(3000, 5000))
+
+        # Validate that the employee's current company or headline matches the target job company
+        try:
+            profile_text = ""
+            intro_card = page.locator("main section").first
+            if intro_card.count() > 0:
+                profile_text = intro_card.inner_text().lower()
+            else:
+                main_locator = page.locator("main").first
+                if main_locator.count() > 0:
+                    profile_text = main_locator.inner_text().lower()
+
+            if profile_text:
+                job_norm = re.sub(r"[^\w\s]", "", job_company).strip().lower()
+                profile_norm = re.sub(r"[^\w\s]", "", profile_text).strip()
+
+                if job_norm not in profile_norm and job_company.lower() not in profile_text:
+                    print(
+                        f"[Validation] Company mismatch: Profile page does not mention Job company '{job_company}'. Skipping message."
+                    )
+                    return False
+        except Exception as e:
+            print(f"[Validation] Warning: Could not extract profile text for validation: {e}")
 
         # Close any open message overlay bubbles that might obscure the buttons
         try:
@@ -338,7 +359,6 @@ def send_connection_request(page, employee, job, ai_pitch, config):
 
         # Add note
         # If there are open messaging overlays, we should probably try to close them or ignore them, but for now we focus on the modal
-        # Add note
         add_note_selectors = [
             "div[role='dialog'] button[aria-label='Add a note']:not([disabled]):visible",
             "div[role='dialog'] button:has-text('Add a note'):not([disabled]):visible",
