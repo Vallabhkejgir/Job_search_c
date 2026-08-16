@@ -166,7 +166,9 @@ def send_connection_request(page, employee, job, ai_pitch, config):
     job_company = (job.get("company") or "").strip()
 
     if not emp_company or not job_company:
-        print(f"[Validation] Missing company info (Employee: '{emp_company}', Job: '{job_company}'). Skipping message.")
+        print(
+            f"[Validation] Missing company info (Employee: '{emp_company}', Job: '{job_company}'). Skipping message."
+        )
         return False
 
     emp_norm = re.sub(r"[^\w\s]", "", emp_company).strip().lower()
@@ -263,21 +265,28 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                 job_norm = re.sub(r"[^\w\s]", "", job_company).strip().lower()
                 profile_norm = re.sub(r"[^\w\s]", "", profile_text).strip()
 
-                if job_norm not in profile_norm and job_company.lower() not in profile_text:
+                if (
+                    job_norm not in profile_norm
+                    and job_company.lower() not in profile_text
+                ):
                     print(
                         f"[Validation] Company mismatch: Profile page does not mention Job company '{job_company}'. Skipping message."
                     )
                     return False
         except Exception as e:
-            print(f"[Validation] Warning: Could not extract profile text for validation: {e}")
+            print(
+                f"[Validation] Warning: Could not extract profile text for validation: {e}"
+            )
 
         # Close any open message overlay bubbles that might obscure the buttons
         try:
-            close_buttons = page.locator("button.msg-overlay-bubble-header__control--close-btn:visible").all()
+            close_buttons = page.locator(
+                "button.msg-overlay-bubble-header__control--close-btn:visible"
+            ).all()
             for btn in close_buttons:
                 btn.evaluate("node => node.click()")
             page.wait_for_timeout(1000)
-        except Exception as e:
+        except Exception:
             pass
 
         # Click connect
@@ -288,7 +297,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
             "button[aria-label*='Connect']:not([disabled]):visible",
             "main button:has-text('Connect'):not([disabled]):visible",
             "main a:has-text('Connect'):not([disabled]):visible",
-            "button:has-text('Connect'):not([disabled]):visible"
+            "button:has-text('Connect'):not([disabled]):visible",
         ]
         connect_btn = page.locator(", ".join(connect_selectors)).first
 
