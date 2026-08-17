@@ -5,3 +5,6 @@ __pycache__/
 session/
 linkedin_agent.db
 agent.lock
+jobs.db
+test_run*.log
+wait_test.sh
