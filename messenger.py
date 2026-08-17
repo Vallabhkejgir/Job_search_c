@@ -6,7 +6,7 @@ from database import is_user_messaged, log_user_messaged
 
 def search_employees(page, company_url, company_name, target_titles):
     """
-    Search for employees at a specific company with target titles by visiting the company's People tab.
+    Search for employees at a specific company with target titles by visiting the company's People tab. Scopes scraping strictly to the people directory to avoid leaking chat overlay contacts.
     Sanitizes extracted employee names (removing badges like 'is open to work', normalizing multiple spaces, and stripping 'View' prefixes to prevent 'Hi View' greetings) and ensures returned profile URLs are absolute.
     """
     print(f"[Search] Searching for contacts at {company_name}...")
@@ -244,7 +244,7 @@ def construct_message(first_name, job, ai_pitch, config):
 
 def send_connection_request(page, employee, job, ai_pitch, config):
     """
-    Navigates to profile and sends connection request with a note.
+    Navigates to profile and sends connection request with a note, falling back to a direct message if the connect button is not available.
     Extracts and sanitizes the first name by handling titles, possessives, and trailing symbols, safely falling back to 'there' if the name resolves exclusively to 'View' or is empty, to avoid broken messages.
     Validates that the employee's company matches the job opening company before drafting or sending outreach.
     """

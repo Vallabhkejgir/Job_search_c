@@ -391,3 +391,4 @@ def test_consecutive_outreach_targeting_isolation():
 if __name__ == "__main__":
     test_user_introduction_env()
     test_real_time_pipeline_9_people()
+    test_consecutive_outreach_targeting_isolation()
