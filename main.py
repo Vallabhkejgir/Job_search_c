@@ -90,13 +90,9 @@ def main():
                 for job in jobs_batch:
                     company_name = job["company"]
                     if company_name not in processed_company_names:
-                        if companies_processed >= config.MAX_COMPANIES_TO_PROCESS:
-                            print(
-                                f"Reached MAX_COMPANIES_TO_PROCESS limit ({config.MAX_COMPANIES_TO_PROCESS}). Stopping."
-                            )
-                            break
+                        if len(processed_company_names) >= config.MAX_COMPANIES_TO_PROCESS:
+                            continue  # Skip jobs from new companies, but process remaining jobs for allowed companies
                         processed_company_names.add(company_name)
-                        companies_processed += 1
 
                     match_reason = f"Relevant opening for {job['title']}"
                     target_titles = [

@@ -282,11 +282,20 @@ def send_connection_request(page, employee, job, ai_pitch, config):
         try:
             page.evaluate("""() => {
                 const buttons = document.querySelectorAll(
-                    '.msg-overlay-bubble-header__control--close-btn, [data-control-name="overlay.close_conversation_bubble"], aside.msg-overlay-container [aria-label*="Close"], aside.msg-overlay-container [aria-label*="Minimize"]'
+                    '.msg-overlay-bubble-header__control--close-btn, [data-control-name="overlay.close_conversation_bubble"], aside.msg-overlay-container [aria-label*="Close"], aside.msg-overlay-container [aria-label*="Minimize"], button[aria-label*="Close your conversation"], button[aria-label*="close your conversation" i]'
                 );
                 buttons.forEach(b => b.click());
             }""")
             page.wait_for_timeout(1000)
+            
+            try:
+                close_btns = page.locator("button.msg-overlay-bubble-header__control--close-btn, button[aria-label*='Close your conversation']").all()
+                for btn in close_btns:
+                    if btn.is_visible():
+                        btn.click(force=True, timeout=1000)
+                page.wait_for_timeout(500)
+            except Exception:
+                pass
         except Exception:
             pass
 
@@ -349,10 +358,15 @@ def send_connection_request(page, employee, job, ai_pitch, config):
             "main button[aria-label*='Connect']:not([disabled]):visible",
             "main button:has-text('Connect'):not([disabled]):visible",
             "main a:has-text('Connect'):not([disabled]):visible",
+            "main a[aria-label*='Connect']:not([disabled]):visible",
+            "main div[role='button']:has-text('Connect'):not([disabled]):visible",
             "button.pvs-profile-actions__action:has-text('Connect'):not([disabled]):visible",
             "button[aria-label*='Invite']:not([disabled]):visible",
             "button[aria-label*='Connect']:not([disabled]):visible",
             "button:has-text('Connect'):not([disabled]):visible",
+            "a[aria-label*='Connect']:not([disabled]):visible",
+            "a:has-text('Connect'):not([disabled]):visible",
+            "div[role='button']:has-text('Connect'):not([disabled]):visible",
         ]
         connect_btn = page.locator(", ".join(connect_selectors)).first
 
@@ -517,8 +531,15 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                 "main button.pvs-profile-actions__action:has-text('Message'):not([disabled]):visible",
                 "main button[aria-label*='Message']:not([disabled]):visible",
                 "main button:has-text('Message'):not([disabled]):visible",
+                "main a[aria-label*='Message']:not([disabled]):visible",
+                "main a:has-text('Message'):not([disabled]):visible",
+                "main div[role='button']:has-text('Message'):not([disabled]):visible",
                 "button.pvs-profile-actions__action:has-text('Message'):not([disabled]):visible",
                 "button[aria-label*='Message']:not([disabled]):visible",
+                "button:has-text('Message'):not([disabled]):visible",
+                "a[aria-label*='Message']:not([disabled]):visible",
+                "a:has-text('Message'):not([disabled]):visible",
+                "div[role='button']:has-text('Message'):not([disabled]):visible",
             ]
             message_btn = page.locator(", ".join(message_btn_selectors)).first
 
@@ -533,25 +554,41 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                     page.wait_for_timeout(random.randint(2000, 3500))
 
                     # Locate compose area in the newly opened conversation bubble
-                    convo_box = page.locator(
-                        "aside.msg-overlay-container div.msg-overlay-conversation-bubble--is-active, "
-                        "aside.msg-overlay-container div.msg-convo-wrapper, "
+                    convo_box = None
+                    convo_candidates = page.locator(
+                        "aside.msg-overlay-container div.msg-overlay-conversation-bubble:visible, "
                         "div.msg-overlay-conversation-bubble:visible, "
                         "div[role='dialog']:visible"
-                    ).last
+                    )
+                    
+                    specific_box = convo_candidates.filter(has_text=re.compile(re.escape(first_name), re.IGNORECASE)).first
+                    if specific_box.count() > 0 and specific_box.is_visible():
+                        convo_box = specific_box
+                    else:
+                        convo_box = page.locator(
+                            "aside.msg-overlay-container div.msg-overlay-conversation-bubble--is-active, "
+                            "aside.msg-overlay-container div.msg-convo-wrapper, "
+                            "div.msg-overlay-conversation-bubble:visible, "
+                            "div[role='dialog']:visible"
+                        ).last
 
                     if convo_box.count() > 0 and convo_box.is_visible():
                         dm_box = convo_box.locator(
                             "div.msg-form__contenteditable[contenteditable='true']:visible, "
+                            "div.msg-form__contenteditable:visible, "
                             "div[role='textbox']:visible, "
                             "textarea[name='message']:visible, "
-                            "textarea:visible"
+                            "textarea:visible, "
+                            ".msg-form__contenteditable"
                         ).first
                     else:
                         dm_box = page.locator(
                             "div.msg-form__contenteditable[contenteditable='true']:visible, "
+                            "div.msg-form__contenteditable:visible, "
                             "div[role='textbox']:visible, "
-                            "textarea[name='message']:visible"
+                            "textarea[name='message']:visible, "
+                            "textarea:visible, "
+                            ".msg-form__contenteditable"
                         ).first
 
                     if dm_box.count() > 0 and dm_box.is_visible():
