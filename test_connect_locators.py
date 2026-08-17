@@ -84,6 +84,38 @@ HTML_SCENARIO_NAME_VERIFY = """
 </html>
 """
 
+HTML_SCENARIO_DIRECT_MESSAGE = """
+<!DOCTYPE html>
+<html>
+<head><title>Direct Message</title></head>
+<body>
+    <main>
+        <section><h1>Jane Doe</h1><p>Engineer at TestCorp</p></section>
+        <button aria-label="Message" id="msg-btn">Message</button>
+    </main>
+    <aside class="msg-overlay-container" style="display: none;">
+        <div class="msg-overlay-conversation-bubble--is-active">
+            <div role="textbox" contenteditable="true" id="dm-box" class="msg-form__contenteditable"></div>
+            <button class="msg-form__send-button" id="dm-send-btn">Send</button>
+        </div>
+    </aside>
+    <script>
+        document.getElementById('msg-btn').addEventListener('click', () => {
+            document.querySelector('aside').style.display = 'block';
+        });
+        document.getElementById('dm-send-btn').addEventListener('click', () => {
+            const val = document.getElementById('dm-box').innerText || document.getElementById('dm-box').textContent;
+            if (val.includes('Hi Jane')) {
+                console.log('Direct message sent successfully!');
+            } else {
+                console.log('Direct message failed! Content:', val);
+            }
+        });
+    </script>
+</body>
+</html>
+"""
+
 def run_test_scenario(p, html_content, name):
     print(f"\nRunning scenario: {name}")
     browser = p.chromium.launch(headless=True)
@@ -122,3 +154,4 @@ with sync_playwright() as p:
     run_test_scenario(p, HTML_SCENARIO_MORE_CONNECT, "Connect inside More menu")
     run_test_scenario(p, HTML_SCENARIO_CHAT_BUBBLE, "Close chat bubble & scope textarea")
     run_test_scenario(p, HTML_SCENARIO_NAME_VERIFY, "Verify actual name on profile")
+    run_test_scenario(p, HTML_SCENARIO_DIRECT_MESSAGE, "Send direct message when Connect is not available")

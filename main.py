@@ -90,13 +90,9 @@ def main():
                 for job in jobs_batch:
                     company_name = job["company"]
                     if company_name not in processed_company_names:
-                        if companies_processed >= config.MAX_COMPANIES_TO_PROCESS:
-                            print(
-                                f"Reached MAX_COMPANIES_TO_PROCESS limit ({config.MAX_COMPANIES_TO_PROCESS}). Stopping."
-                            )
-                            break
+                        if len(processed_company_names) >= config.MAX_COMPANIES_TO_PROCESS:
+                            continue  # Skip jobs from new companies, but process remaining jobs for allowed companies
                         processed_company_names.add(company_name)
-                        companies_processed += 1
 
                     match_reason = f"Relevant opening for {job['title']}"
                     target_titles = [
@@ -105,11 +101,8 @@ def main():
                         "Hiring Manager",
                     ]
 
-                    # Log job
-                    log_job_processed(
-                        job["job_id"], job["title"], job["company"], True, match_reason
-                    )
                     print(f"Processing job match: {job['title']} at {job['company']}")
+                    messages_sent_for_this_job = 0
 
                     # Check daily message limit
                     if messages_sent_today >= config.MAX_MESSAGES_PER_DAY:
@@ -168,6 +161,7 @@ def main():
                             if success:
                                 messages_sent_today += 1
                                 messaged_for_this_company += 1
+                                messages_sent_for_this_job += 1
                                 company_message_counts[company_name] = (
                                     messaged_for_this_company
                                 )
@@ -176,6 +170,19 @@ def main():
                         print(f"Error processing outreach for {job['company']}: {e}")
                     finally:
                         auth_context.close()
+                        
+                    # Log job ONLY if we successfully sent at least one message for this job/company
+                    if messages_sent_for_this_job > 0:
+                        log_job_processed(
+                            job["job_id"], job["title"], job["company"], True, match_reason
+                        )
+                        print(f"Logged job {job['job_id']} to DB as messages were sent.")
+                    else:
+                        print(f"Did not log job {job['job_id']} to DB as no messages were sent.")
+                        # Remove from processed_company_names so it can be retried in future runs
+                        if company_name in processed_company_names:
+                            processed_company_names.remove(company_name)
+                            companies_processed -= 1
 
                 # Check global limits before loading the next page
                 if (

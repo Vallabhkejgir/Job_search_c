@@ -73,7 +73,8 @@ def test_employee_sanitize(mock_is_user_messaged):
 
     # Mocking page methods
     def page_locator(selector):
-        if selector == "a[href*='/in/']":
+        if selector in ("a[href*='/in/']", "a[href*='/in/']:not(aside a):not(header a):not(nav a)"):
+            mock_links_locator.count.return_value = 1
             return mock_links_locator
 
         # search input mock
