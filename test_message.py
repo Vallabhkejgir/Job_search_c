@@ -79,7 +79,7 @@ from unittest.mock import patch
 
 
 class MockLocator:
-    def __init__(self, elements=None, text="", html="", attrs=None):
+    def __init__(self, elements=None, text="", html="", attrs=None, on_fill=None):
         if elements is not None:
             self.elements = elements
         else:
@@ -87,6 +87,7 @@ class MockLocator:
             self.text = text
             self.html = html
             self.attrs = attrs or {}
+        self._on_fill = on_fill
 
     def filter(self, **kwargs):
         return self
@@ -96,15 +97,16 @@ class MockLocator:
 
     def nth(self, i):
         if i < len(self.elements):
-            return MockLocator([self.elements[i]])
+            return MockLocator([self.elements[i]], on_fill=self._on_fill)
         return MockLocator([])
 
     def all(self):
-        return [MockLocator([e]) for e in self.elements]
+        return [MockLocator([e], on_fill=self._on_fill) for e in self.elements]
 
     @property
     def first(self):
-        return MockLocator([self.elements[0]]) if self.elements else MockLocator([])
+        on_fill = self._on_fill or (self.elements[0]._on_fill if self.elements and hasattr(self.elements[0], '_on_fill') else None)
+        return MockLocator([self.elements[0]], on_fill=on_fill) if self.elements else MockLocator([])
 
     def is_visible(self):
         return len(self.elements) > 0
@@ -113,7 +115,10 @@ class MockLocator:
         pass
 
     def fill(self, text, **kwargs):
-        pass
+        if self.elements and self.elements[0] is not self:
+            return self.elements[0].fill(text, **kwargs)
+        if self._on_fill:
+            self._on_fill(text)
 
     def press(self, key, **kwargs):
         pass
@@ -136,6 +141,9 @@ class MockLocator:
     def scroll_into_view_if_needed(self, **kwargs):
         pass
 
+    def evaluate(self, script, **kwargs):
+        pass
+
     def locator(self, selector):
         if self.elements and self.elements[0] is not self:
             return self.elements[0].locator(selector)
@@ -144,7 +152,7 @@ class MockLocator:
             return MockLocator([MockLocator(text="Mocked job description")])
         if "img" in selector:
             return MockLocator([])
-        return MockLocator([])
+        return MockLocator([MockLocator(on_fill=self._on_fill)], on_fill=self._on_fill)
 
 
 class MockPageE2E:
@@ -326,6 +334,58 @@ def test_real_time_pipeline_9_people():
 
     if os.path.exists(database.DB_NAME):
         os.remove(database.DB_NAME)
+
+
+def test_consecutive_outreach_targeting_isolation():
+    from messenger import send_connection_request
+    import database
+    database.init_db()
+
+    sent_messages = []
+
+    class MockSequentialPage:
+        def __init__(self):
+            self.current_url = ""
+
+        def goto(self, url, **kwargs):
+            self.current_url = url
+
+        def wait_for_timeout(self, timeout):
+            pass
+
+        def evaluate(self, script, **kwargs):
+            pass
+
+        def locator(self, selector):
+            if "h1" in selector:
+                if "alice" in self.current_url:
+                    return MockLocator(text="Alice Smith")
+                elif "bob" in self.current_url:
+                    return MockLocator(text="Bob Jones")
+                return MockLocator(text="Candidate")
+            if "textarea" in selector:
+                return MockLocator([MockLocator(on_fill=sent_messages.append)], on_fill=sent_messages.append)
+            if "Connect" in selector or "Invite" in selector or "Add a note" in selector or "Send" in selector or "dialog" in selector or "modal" in selector:
+                return MockLocator([MockLocator(on_fill=sent_messages.append)], on_fill=sent_messages.append)
+            return MockLocator([MockLocator()])
+
+    page = MockSequentialPage()
+    job = {"title": "Software Engineer", "company": "Acme Corp", "job_id": "100"}
+    config.DRY_RUN = False
+    config.USER_INTRODUCTION = "I am a backend specialist."
+
+    emp1 = {"name": "Alice Smith", "profile_url": "https://linkedin.com/in/alice", "company": "Acme Corp"}
+    emp2 = {"name": "Bob Jones", "profile_url": "https://linkedin.com/in/bob", "company": "Acme Corp"}
+
+    send_connection_request(page, emp1, job, "pitch1", config)
+    send_connection_request(page, emp2, job, "pitch2", config)
+
+    assert len(sent_messages) == 2
+    assert "Hi Alice" in sent_messages[0]
+    assert "Hi Bob" not in sent_messages[0]
+    assert "Hi Bob" in sent_messages[1]
+    assert "Hi Alice" not in sent_messages[1]
+
 
 
 if __name__ == "__main__":

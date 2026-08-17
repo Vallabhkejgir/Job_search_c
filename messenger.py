@@ -28,6 +28,18 @@ def search_employees(page, company_url, company_name, target_titles):
         print(f"Failed to load company people page for {company_name}: {e}")
         return employees
 
+    # Close any open chat bubbles so they don't leak into employee search results
+    try:
+        page.evaluate("""() => {
+            const buttons = document.querySelectorAll(
+                '.msg-overlay-bubble-header__control--close-btn, [data-control-name="overlay.close_conversation_bubble"], aside.msg-overlay-container [aria-label*="Close"], aside.msg-overlay-container [aria-label*="Minimize"]'
+            );
+            buttons.forEach(b => b.click());
+        }""")
+        page.wait_for_timeout(1000)
+    except Exception:
+        pass
+
     # Type the target titles into the "Search employees" input box
     try:
         keywords = " OR ".join([f'"{title}"' for title in target_titles])
@@ -46,9 +58,16 @@ def search_employees(page, company_url, company_name, target_titles):
         page.evaluate("window.scrollBy(0, 1000)")
         page.wait_for_timeout(1000)
 
-    # Extract profiles from the company people grid
-    # Usually the grid cards contain links to profiles
-    profile_links = page.locator("a[href*='/in/']").all()
+    # Extract profiles strictly from the people directory, ignoring chat overlays and navigation bars
+    try:
+        profile_links_scoped = page.locator("a[href*='/in/']:not(aside a):not(header a):not(nav a)")
+        if profile_links_scoped.count() > 0:
+            profile_links = profile_links_scoped.all()
+        else:
+            profile_links = page.locator("a[href*='/in/']").all()
+    except Exception:
+        profile_links = page.locator("a[href*='/in/']").all()
+
     print(f"Found {len(profile_links)} profile links to evaluate on company page.")
 
     # Use a set to deduplicate since links often appear twice (image and text)
@@ -134,12 +153,16 @@ def search_employees(page, company_url, company_name, target_titles):
                 "picture",
                 "mutual connection",
                 "mutual connections",
+                "message",
+                "more",
             }
 
             if (
                 name.lower() in invalid_terms
                 or name.lower() == company_name.lower()
                 or len(name) < 2
+                or "/in/me" in profile_url.lower()
+                or "/in/unavailable" in profile_url.lower()
                 or is_user_messaged(profile_url)
             ):
                 continue
@@ -252,7 +275,7 @@ def send_connection_request(page, employee, job, ai_pitch, config):
 
     try:
         # Actually navigate and send
-        page.goto(employee["profile_url"])
+        page.goto(employee["profile_url"], wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(random.randint(3000, 5000))
 
         # Close/minimize any open message overlay bubbles so they don't intercept focus or clicks
@@ -277,7 +300,12 @@ def send_connection_request(page, employee, job, ai_pitch, config):
                     clean_page_name = re.sub(r"(?i)\s*(is\s+)?open\s+to\s+work.*", "", clean_page_name)
                     clean_page_name = re.sub(r"(?i)\s*follows this page.*", "", clean_page_name)
                     clean_page_name = " ".join(clean_page_name.split())
-                    if clean_page_name and clean_page_name.lower() != "view":
+                    invalid_name_terms = {
+                        "view", "post", "linkedin member", "follow", "connect", "member",
+                        (job.get("title") or "").strip().lower(),
+                        (job.get("company") or "").strip().lower(),
+                    }
+                    if clean_page_name and clean_page_name.lower() not in invalid_name_terms:
                         employee["name"] = clean_page_name
                         first_name = extract_first_name(clean_page_name)
                         message = construct_message(first_name, job, ai_pitch, config)
@@ -316,11 +344,14 @@ def send_connection_request(page, employee, job, ai_pitch, config):
         # Click connect
         # Need to handle different variants of the Connect button
         connect_selectors = [
+            "main button.pvs-profile-actions__action:has-text('Connect'):not([disabled]):visible",
+            "main button[aria-label*='Invite']:not([disabled]):visible",
+            "main button[aria-label*='Connect']:not([disabled]):visible",
+            "main button:has-text('Connect'):not([disabled]):visible",
+            "main a:has-text('Connect'):not([disabled]):visible",
             "button.pvs-profile-actions__action:has-text('Connect'):not([disabled]):visible",
             "button[aria-label*='Invite']:not([disabled]):visible",
             "button[aria-label*='Connect']:not([disabled]):visible",
-            "main button:has-text('Connect'):not([disabled]):visible",
-            "main a:has-text('Connect'):not([disabled]):visible",
             "button:has-text('Connect'):not([disabled]):visible",
         ]
         connect_btn = page.locator(", ".join(connect_selectors)).first
@@ -328,156 +359,261 @@ def send_connection_request(page, employee, job, ai_pitch, config):
         if connect_btn.count() == 0 or not connect_btn.is_visible():
             # Sometimes it's under 'More'
             more_selectors = [
+                "main button.pvs-profile-actions__action:has-text('More'):visible",
+                "main button[aria-label='More actions']:visible",
+                "main button[aria-label='More']:visible",
+                "main button:has-text('More'):visible",
                 "button.pvs-profile-actions__action:has-text('More'):visible",
                 "button[aria-label='More actions']:visible",
                 "button[aria-label='More']:visible",
-                "main button:has-text('More'):visible",
             ]
             more_btn = page.locator(", ".join(more_selectors)).first
             if more_btn.count() > 0 and more_btn.is_visible():
-                more_btn.click(force=True)
-                page.wait_for_timeout(1500)
-
-                # After clicking More, look for Connect in the dropdown
-                dropdown_connect = [
-                    "div.artdeco-dropdown__content button:has-text('Connect'):visible",
-                    "div.artdeco-dropdown__content span:has-text('Connect'):visible",
-                    "ul *:has-text('Connect'):visible",
-                    "div[role='menu'] *:has-text('Connect'):visible",
-                ]
-                connect_btn = page.locator(", ".join(dropdown_connect)).first
-
-        if connect_btn.count() == 0 or not connect_btn.is_visible():
-            print(f"Could not find Connect button for {employee['name']}")
-            return False
-
-        # Use click(force=True) to avoid interception but wrap in try-except
-        try:
-            try:
-                connect_btn.evaluate("node => node.click()")
-            except Exception as e:
-                print(f"Evaluate Connect error: {e}")
-                connect_btn.click(force=True, timeout=5000)
-        except Exception as e:  # noqa: BLE001
-            print(f"Failed to click Connect button: {e}")
-            return False
-
-        page.wait_for_timeout(random.randint(1500, 2500))
-
-        # Handle 'Other' connection reason if LinkedIn asks how we know the person
-        other_reason_btn = page.locator(
-            "button[aria-label*='Other']:not([disabled]):visible, button:has-text('Other'):not([disabled]):visible"
-        ).first
-        if other_reason_btn.count() > 0 and other_reason_btn.is_visible():
-            try:
                 try:
-                    other_reason_btn.evaluate("node => node.click()")
-                except Exception as e:
-                    print(f"Evaluate Other reason error: {e}")
-                    other_reason_btn.click(force=True, timeout=3000)
-                page.wait_for_timeout(1000)
-                # Click Connect again on the modal
-                modal_connect = page.locator(
-                    "button[aria-label='Connect']:visible, div[role='dialog'] button.artdeco-button--primary:visible"
-                ).first
-                if modal_connect.count() > 0 and modal_connect.is_visible():
-                    try:
-                        modal_connect.evaluate("node => node.click()")
-                    except Exception as e:
-                        print(f"Evaluate modal Connect error: {e}")
-                        modal_connect.click(force=True, timeout=3000)
+                    more_btn.click(force=True)
                     page.wait_for_timeout(1500)
-            except Exception as e:  # noqa: BLE001
-                print(f"Failed to click other reason or modal connect: {e}")
 
-        # Add note strictly within connection dialog
-        modal = page.locator("div[role='dialog']:visible, div.send-invite:visible, div.artdeco-modal:visible").first
-        add_note_selectors = [
-            "button[aria-label='Add a note']:not([disabled]):visible",
-            "button:has-text('Add a note'):not([disabled]):visible",
-            "button:has-text('Add note'):not([disabled]):visible",
-            "button.artdeco-button--secondary:has-text('Add a note'):not([disabled]):visible",
-        ]
+                    # After clicking More, look for Connect in the dropdown
+                    dropdown_connect = [
+                        "div.artdeco-dropdown__content button:has-text('Connect'):visible",
+                        "div.artdeco-dropdown__content span:has-text('Connect'):visible",
+                        "ul *:has-text('Connect'):visible",
+                        "div[role='menu'] *:has-text('Connect'):visible",
+                    ]
+                    connect_btn = page.locator(", ".join(dropdown_connect)).first
+                except Exception:
+                    pass
 
-        if modal.count() > 0 and modal.is_visible():
-            add_note_btn = modal.locator(", ".join(add_note_selectors)).first
-        else:
-            add_note_btn = page.locator(", ".join(add_note_selectors)).first
+        connected_or_messaged = False
 
-        if add_note_btn.count() > 0 and add_note_btn.is_visible():
+        if connect_btn.count() > 0 and connect_btn.is_visible():
+            # Use click(force=True) to avoid interception but wrap in try-except
             try:
                 try:
-                    add_note_btn.evaluate("node => node.click()")
+                    connect_btn.evaluate("node => node.click()")
                 except Exception as e:
-                    print(f"Evaluate Add note error: {e}")
-                    add_note_btn.click(force=True, timeout=5000)
-                page.wait_for_timeout(1000)
+                    print(f"Evaluate Connect error: {e}")
+                    connect_btn.click(force=True, timeout=5000)
 
-                # Locate textarea strictly in active connection modal
-                dialog = page.locator("div[role='dialog']:visible, div.send-invite:visible, div.artdeco-modal:visible").first
-                if dialog.count() > 0 and dialog.is_visible():
-                    msg_box = dialog.locator(
-                        "textarea[name='message']:visible, textarea#custom-message:visible, textarea:visible"
-                    ).first
-                else:
-                    msg_box = page.locator(
-                        "textarea[name='message']:visible, textarea#custom-message:visible, div[role='dialog'] textarea:visible"
-                    ).first
+                page.wait_for_timeout(random.randint(1500, 2500))
 
-                msg_box.fill(message, timeout=5000)
-                page.wait_for_timeout(random.randint(1000, 2000))
+                # Handle 'Other' connection reason if LinkedIn asks how we know the person
+                other_reason_btn = page.locator(
+                    "button[aria-label*='Other']:not([disabled]):visible, button:has-text('Other'):not([disabled]):visible"
+                ).first
+                if other_reason_btn.count() > 0 and other_reason_btn.is_visible():
+                    try:
+                        try:
+                            other_reason_btn.evaluate("node => node.click()")
+                        except Exception as e:
+                            print(f"Evaluate Other reason error: {e}")
+                            other_reason_btn.click(force=True, timeout=3000)
+                        page.wait_for_timeout(1000)
+                        # Click Connect again on the modal
+                        modal_connect = page.locator(
+                            "button[aria-label='Connect']:visible, div[role='dialog'] button.artdeco-button--primary:visible"
+                        ).first
+                        if modal_connect.count() > 0 and modal_connect.is_visible():
+                            try:
+                                modal_connect.evaluate("node => node.click()")
+                            except Exception as e:
+                                print(f"Evaluate modal Connect error: {e}")
+                                modal_connect.click(force=True, timeout=3000)
+                            page.wait_for_timeout(1500)
+                    except Exception as e:  # noqa: BLE001
+                        print(f"Failed to click other reason or modal connect: {e}")
 
-                # Click send strictly within connection modal
-                send_selectors = [
-                    "button[aria-label='Send invitation']:visible",
-                    "button[aria-label='Send now']:visible",
-                    "button:has-text('Send'):visible",
-                    "button:has-text('Send without a note'):visible",
+                # Add note strictly within connection dialog
+                modal = page.locator("div[role='dialog']:visible, div.send-invite:visible, div.artdeco-modal:visible").first
+                add_note_selectors = [
+                    "button[aria-label='Add a note']:not([disabled]):visible",
+                    "button:has-text('Add a note'):not([disabled]):visible",
+                    "button:has-text('Add note'):not([disabled]):visible",
+                    "button.artdeco-button--secondary:has-text('Add a note'):not([disabled]):visible",
                 ]
-                if dialog.count() > 0 and dialog.is_visible():
-                    send_btn = (
-                        dialog.locator(", ".join(send_selectors))
-                        .filter(has_text=re.compile(r"Send|Send now", re.IGNORECASE))
-                        .first
-                    )
-                    if send_btn.count() == 0:
-                        send_btn = dialog.locator(", ".join(send_selectors)).first
+
+                if modal.count() > 0 and modal.is_visible():
+                    add_note_btn = modal.locator(", ".join(add_note_selectors)).first
                 else:
-                    send_btn = (
-                        page.locator(", ".join(send_selectors))
-                        .filter(has_text=re.compile(r"Send|Send now", re.IGNORECASE))
-                        .first
-                    )
-                    if send_btn.count() == 0:
-                        send_btn = page.locator(", ".join(send_selectors)).first
+                    add_note_btn = page.locator(", ".join(add_note_selectors)).first
 
-                try:
-                    send_btn.evaluate("node => node.click()")
-                except Exception as e:
-                    print(f"Evaluate Send error: {e}")
-                    send_btn.click(force=True, timeout=5000)
+                if add_note_btn.count() > 0 and add_note_btn.is_visible():
+                    try:
+                        add_note_btn.evaluate("node => node.click()")
+                    except Exception as e:
+                        print(f"Evaluate Add note error: {e}")
+                        add_note_btn.click(force=True, timeout=5000)
+                    page.wait_for_timeout(1000)
 
-                print(f"Successfully sent connection request to {employee['name']}")
-                log_user_messaged(
-                    employee["profile_url"],
-                    employee["name"],
-                    employee["company"],
-                    job["job_id"],
-                )
+                    # Locate textarea strictly in active connection modal
+                    dialog = page.locator("div[role='dialog']:visible, div.send-invite:visible, div.artdeco-modal:visible").first
+                    if dialog.count() > 0 and dialog.is_visible():
+                        msg_box = dialog.locator(
+                            "textarea[name='message']:visible, textarea#custom-message:visible, textarea:visible"
+                        ).first
+                    else:
+                        msg_box = page.locator(
+                            "div[role='dialog'] textarea:visible, div.artdeco-modal textarea:visible, textarea[name='message']:visible:not(aside textarea), textarea#custom-message:visible:not(aside textarea)"
+                        ).first
+                        if msg_box.count() == 0:
+                            msg_box = page.locator("textarea:visible:not(aside textarea)").first
 
-                # Sleep to avoid rate limits
-                sleep_time = random.randint(15000, 30000)
-                print(f"Sleeping for {sleep_time / 1000}s to avoid rate limits...")
-                page.wait_for_timeout(sleep_time)
-                return True
+                    if msg_box.count() > 0 and msg_box.is_visible():
+                        msg_box.fill(message, timeout=5000)
+                        page.wait_for_timeout(random.randint(1000, 2000))
+
+                        # Click send strictly within connection modal
+                        send_selectors = [
+                            "button[aria-label='Send invitation']:visible",
+                            "button[aria-label='Send now']:visible",
+                            "button:has-text('Send'):visible",
+                            "button:has-text('Send without a note'):visible",
+                        ]
+                        if dialog.count() > 0 and dialog.is_visible():
+                            send_btn = (
+                                dialog.locator(", ".join(send_selectors))
+                                .filter(has_text=re.compile(r"Send|Send now", re.IGNORECASE))
+                                .first
+                            )
+                            if send_btn.count() == 0:
+                                send_btn = dialog.locator(", ".join(send_selectors)).first
+                        else:
+                            send_btn = (
+                                page.locator("div[role='dialog'] button:visible, div.artdeco-modal button:visible")
+                                .filter(has_text=re.compile(r"Send|Send now", re.IGNORECASE))
+                                .first
+                            )
+                            if send_btn.count() == 0:
+                                send_btn = (
+                                    page.locator(", ".join(send_selectors))
+                                    .filter(has_text=re.compile(r"Send|Send now", re.IGNORECASE))
+                                    .first
+                                )
+                            if send_btn.count() == 0:
+                                send_btn = page.locator(", ".join(send_selectors)).first
+
+                        if send_btn.count() > 0 and send_btn.is_visible():
+                            try:
+                                send_btn.evaluate("node => node.click()")
+                            except Exception as e:
+                                print(f"Evaluate Send error: {e}")
+                                send_btn.click(force=True, timeout=5000)
+
+                            print(f"Successfully sent connection request to {employee['name']}")
+                            log_user_messaged(
+                                employee["profile_url"],
+                                employee["name"],
+                                employee["company"],
+                                job["job_id"],
+                            )
+                            connected_or_messaged = True
             except Exception as e:  # noqa: BLE001
-                print(f"Error while interacting with connection modal: {e}")
-                return False
-        else:
-            print(
-                f"Could not find 'Add a note' button on connection modal for {employee['name']}. Skipping outreach."
-            )
-            return False
+                print(f"Error during connect flow for {employee['name']}: {e}")
+
+        # If Connect flow was not possible or unsuccessful, check for direct Message button on profile
+        if not connected_or_messaged:
+            print(f"Connect option not completed for {employee['name']}. Checking for direct Message button...")
+            message_btn_selectors = [
+                "main button.pvs-profile-actions__action:has-text('Message'):not([disabled]):visible",
+                "main button[aria-label*='Message']:not([disabled]):visible",
+                "main button:has-text('Message'):not([disabled]):visible",
+                "button.pvs-profile-actions__action:has-text('Message'):not([disabled]):visible",
+                "button[aria-label*='Message']:not([disabled]):visible",
+            ]
+            message_btn = page.locator(", ".join(message_btn_selectors)).first
+
+            if message_btn.count() > 0 and message_btn.is_visible():
+                print(f"Found direct Message button for {employee['name']}. Sending direct message...")
+                try:
+                    try:
+                        message_btn.evaluate("node => node.click()")
+                    except Exception:
+                        message_btn.click(force=True, timeout=5000)
+
+                    page.wait_for_timeout(random.randint(2000, 3500))
+
+                    # Locate compose area in the newly opened conversation bubble
+                    convo_box = page.locator(
+                        "aside.msg-overlay-container div.msg-overlay-conversation-bubble--is-active, "
+                        "aside.msg-overlay-container div.msg-convo-wrapper, "
+                        "div.msg-overlay-conversation-bubble:visible, "
+                        "div[role='dialog']:visible"
+                    ).last
+
+                    if convo_box.count() > 0 and convo_box.is_visible():
+                        dm_box = convo_box.locator(
+                            "div.msg-form__contenteditable[contenteditable='true']:visible, "
+                            "div[role='textbox']:visible, "
+                            "textarea[name='message']:visible, "
+                            "textarea:visible"
+                        ).first
+                    else:
+                        dm_box = page.locator(
+                            "div.msg-form__contenteditable[contenteditable='true']:visible, "
+                            "div[role='textbox']:visible, "
+                            "textarea[name='message']:visible"
+                        ).first
+
+                    if dm_box.count() > 0 and dm_box.is_visible():
+                        try:
+                            dm_box.fill(message, timeout=5000)
+                        except Exception:
+                            dm_box.press_sequentially(message, delay=10)
+
+                        page.wait_for_timeout(random.randint(1000, 2000))
+
+                        dm_send_selectors = [
+                            "button.msg-form__send-button:not([disabled]):visible",
+                            "button[type='submit']:not([disabled]):visible",
+                            "button:has-text('Send'):not([disabled]):visible",
+                        ]
+                        if convo_box.count() > 0 and convo_box.is_visible():
+                            dm_send_btn = convo_box.locator(", ".join(dm_send_selectors)).first
+                        else:
+                            dm_send_btn = page.locator(", ".join(dm_send_selectors)).first
+
+                        if dm_send_btn.count() > 0 and dm_send_btn.is_visible():
+                            try:
+                                dm_send_btn.evaluate("node => node.click()")
+                            except Exception:
+                                dm_send_btn.click(force=True, timeout=5000)
+
+                            print(f"Successfully sent direct message to {employee['name']}")
+                            log_user_messaged(
+                                employee["profile_url"],
+                                employee["name"],
+                                employee["company"],
+                                job["job_id"],
+                            )
+                            # Close the message overlay
+                            try:
+                                page.evaluate("""() => {
+                                    const closeBtns = document.querySelectorAll(
+                                        '.msg-overlay-bubble-header__control--close-btn, [data-control-name="overlay.close_conversation_bubble"], aside.msg-overlay-container [aria-label*="Close"]'
+                                    );
+                                    closeBtns.forEach(b => b.click());
+                                }""")
+                            except Exception:
+                                pass
+
+                            connected_or_messaged = True
+                        else:
+                            print(f"Could not find Send button in direct message window for {employee['name']}.")
+                    else:
+                        print(f"Could not find message input box in direct message window for {employee['name']}.")
+                except Exception as e:
+                    print(f"Error sending direct message to {employee['name']}: {e}")
+            else:
+                print(f"Could not find Connect or Message button for {employee['name']}. Skipping outreach.")
+
+        if connected_or_messaged:
+            # Sleep to avoid rate limits
+            sleep_time = random.randint(15000, 30000)
+            print(f"Sleeping for {sleep_time / 1000}s to avoid rate limits...")
+            page.wait_for_timeout(sleep_time)
+            return True
+
+        return False
 
     except Exception as e:  # noqa: BLE001
         print(f"Error sending message to {employee['name']}: {e}")
