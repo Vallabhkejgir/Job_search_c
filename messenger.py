@@ -64,9 +64,9 @@ def search_employees(page, company_url, company_name, target_titles):
         if profile_links_scoped.count() > 0:
             profile_links = profile_links_scoped.all()
         else:
-            profile_links = page.locator("a[href*='/in/']").all()
+            profile_links = []
     except Exception:
-        profile_links = page.locator("a[href*='/in/']").all()
+        profile_links = []
 
     print(f"Found {len(profile_links)} profile links to evaluate on company page.")
 
